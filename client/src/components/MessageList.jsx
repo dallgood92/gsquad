@@ -4,6 +4,8 @@ import {
   useRef,
 } from "react";
 
+const LOAD_MORE_THRESHOLD = 100;
+
 function MessageList({
   messages,
   currentUser,
@@ -12,7 +14,10 @@ function MessageList({
   olderMessagesLoading,
 }) {
   const listRef = useRef(null);
-  const previousMessagesRef = useRef([]);
+
+  const previousMessagesRef =
+    useRef([]);
+
   const previousScrollHeightRef =
     useRef(null);
 
@@ -23,10 +28,33 @@ function MessageList({
       return;
     }
 
+    if (!hasMoreMessages) {
+      return;
+    }
+
+    if (olderMessagesLoading) {
+      return;
+    }
+
     previousScrollHeightRef.current =
       list.scrollHeight;
 
     await onLoadOlderMessages();
+  };
+
+  const handleScroll = () => {
+    const list = listRef.current;
+
+    if (!list) {
+      return;
+    }
+
+    if (
+      list.scrollTop <=
+      LOAD_MORE_THRESHOLD
+    ) {
+      handleLoadOlder();
+    }
   };
 
   useLayoutEffect(() => {
@@ -37,7 +65,8 @@ function MessageList({
     }
 
     if (
-      previousScrollHeightRef.current !== null
+      previousScrollHeightRef.current !==
+      null
     ) {
       const previousScrollHeight =
         previousScrollHeightRef.current;
@@ -66,7 +95,9 @@ function MessageList({
       ];
 
     const currentLastMessage =
-      messages[messages.length - 1];
+      messages[
+        messages.length - 1
+      ];
 
     const newMessageWasAppended =
       currentLastMessage &&
@@ -88,18 +119,12 @@ function MessageList({
     <div
       ref={listRef}
       className="message-list"
+      onScroll={handleScroll}
     >
-      {hasMoreMessages && (
-        <button
-          type="button"
-          className="load-older-button"
-          onClick={handleLoadOlder}
-          disabled={olderMessagesLoading}
-        >
-          {olderMessagesLoading
-            ? "Loading..."
-            : "Load older messages"}
-        </button>
+      {olderMessagesLoading && (
+        <p className="older-messages-loading">
+          Loading older messages...
+        </p>
       )}
 
       {messages.map((message) => {

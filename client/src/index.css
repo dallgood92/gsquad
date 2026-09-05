@@ -201,3 +201,9 @@ body {
 .presence-dot.online {
   background: #22c55e;
 }
+
+.older-messages-loading {
+  align-self: center;
+  margin: 0;
+  font-size: 14px;
+}
