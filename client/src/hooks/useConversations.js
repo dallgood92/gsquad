@@ -11,22 +11,54 @@ import {
   sendMessage as sendMessageRequest,
 } from "../services/api";
 
+function mergeMessages(...messageGroups) {
+  const messagesById = new Map();
+
+  for (const messages of messageGroups) {
+    for (const message of messages) {
+      messagesById.set(
+        message.id,
+        message
+      );
+    }
+  }
+
+  return Array.from(
+    messagesById.values()
+  ).sort(
+    (firstMessage, secondMessage) =>
+      firstMessage.id -
+      secondMessage.id
+  );
+}
+
 function useConversations() {
-  const [conversations, setConversations] = useState([]);
-  const [selectedConversationId, setSelectedConversationId] =
+  const [conversations, setConversations] =
+    useState([]);
+
+  const [
+    selectedConversationId,
+    setSelectedConversationId,
+  ] = useState(null);
+
+  const [typingUsers, setTypingUsers] =
+    useState({});
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [
+    messagesLoading,
+    setMessagesLoading,
+  ] = useState(false);
+
+  const [
+    olderMessagesLoading,
+    setOlderMessagesLoading,
+  ] = useState(false);
+
+  const [error, setError] =
     useState(null);
-
-  const [typingUsers, setTypingUsers] = useState({});
-
-  const [loading, setLoading] = useState(true);
-
-  const [messagesLoading, setMessagesLoading] =
-    useState(false);
-
-  const [olderMessagesLoading, setOlderMessagesLoading] =
-    useState(false);
-
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     async function loadConversations() {
@@ -34,17 +66,19 @@ function useConversations() {
         setLoading(true);
         setError(null);
 
-        const data = await getConversations();
+        const data =
+          await getConversations();
 
-        const conversationsWithMessageState = data.map(
-          (conversation) => ({
-            ...conversation,
-            messages: [],
-            messagesLoaded: false,
-            hasMoreMessages: false,
-            nextMessageCursor: null,
-          })
-        );
+        const conversationsWithMessageState =
+          data.map(
+            (conversation) => ({
+              ...conversation,
+              messages: [],
+              messagesLoaded: false,
+              hasMoreMessages: false,
+              nextMessageCursor: null,
+            })
+          );
 
         setConversations(
           conversationsWithMessageState
@@ -78,18 +112,21 @@ function useConversations() {
     );
 
   const selectedTypingUsers =
-    typingUsers[selectedConversationId] || [];
+    typingUsers[
+      selectedConversationId
+    ] || [];
 
   useEffect(() => {
     if (!selectedConversationId) {
       return;
     }
 
-    const conversation = conversations.find(
-      (conversation) =>
-        conversation.id ===
-        selectedConversationId
-    );
+    const conversation =
+      conversations.find(
+        (conversation) =>
+          conversation.id ===
+          selectedConversationId
+      );
 
     if (!conversation) {
       return;
@@ -104,30 +141,42 @@ function useConversations() {
         setMessagesLoading(true);
         setError(null);
 
-        const data = await getMessages(
-          selectedConversationId
-        );
+        const conversationId =
+          selectedConversationId;
+
+        const data =
+          await getMessages(
+            conversationId
+          );
 
         setConversations(
           (currentConversations) =>
             currentConversations.map(
               (conversation) => {
                 if (
-                  conversation.id ===
-                  selectedConversationId
+                  conversation.id !==
+                  conversationId
                 ) {
-                  return {
-                    ...conversation,
-                    messages: data.messages,
-                    messagesLoaded: true,
-                    hasMoreMessages:
-                      data.hasMore,
-                    nextMessageCursor:
-                      data.nextCursor,
-                  };
+                  return conversation;
                 }
 
-                return conversation;
+                return {
+                  ...conversation,
+
+                  messages:
+                    mergeMessages(
+                      data.messages,
+                      conversation.messages
+                    ),
+
+                  messagesLoaded: true,
+
+                  hasMoreMessages:
+                    data.hasMore,
+
+                  nextMessageCursor:
+                    data.nextCursor,
+                };
               }
             )
         );
@@ -157,44 +206,48 @@ function useConversations() {
     );
   };
 
-  const createConversation = async (name) => {
-    if (!name.trim()) {
-      return;
-    }
+  const createConversation =
+    async (name) => {
+      if (!name.trim()) {
+        return;
+      }
 
-    try {
-      setError(null);
+      try {
+        setError(null);
 
-      const newConversation =
-        await createConversationRequest(name);
+        const newConversation =
+          await createConversationRequest(
+            name
+          );
 
-      const conversationWithMessageState = {
-        ...newConversation,
-        messages: [],
-        messagesLoaded: true,
-        hasMoreMessages: false,
-        nextMessageCursor: null,
-      };
+        const conversationWithMessageState =
+          {
+            ...newConversation,
+            messages: [],
+            messagesLoaded: true,
+            hasMoreMessages: false,
+            nextMessageCursor: null,
+          };
 
-      setConversations(
-        (currentConversations) => [
-          ...currentConversations,
-          conversationWithMessageState,
-        ]
-      );
+        setConversations(
+          (currentConversations) => [
+            ...currentConversations,
+            conversationWithMessageState,
+          ]
+        );
 
-      setSelectedConversationId(
-        newConversation.id
-      );
-    } catch (error) {
-      console.error(
-        "Failed to create conversation:",
-        error
-      );
+        setSelectedConversationId(
+          newConversation.id
+        );
+      } catch (error) {
+        console.error(
+          "Failed to create conversation:",
+          error
+        );
 
-      setError(error.message);
-    }
-  };
+        setError(error.message);
+      }
+    };
 
   const addMemberToConversation = (
     membership
@@ -223,39 +276,42 @@ function useConversations() {
     );
   };
 
-  const receiveConversation = useCallback(
-    (newConversation) => {
-      setConversations(
-        (currentConversations) => {
-          const conversationAlreadyExists =
-            currentConversations.some(
-              (conversation) =>
-                conversation.id ===
-                newConversation.id
-            );
+  const receiveConversation =
+    useCallback(
+      (newConversation) => {
+        setConversations(
+          (currentConversations) => {
+            const conversationAlreadyExists =
+              currentConversations.some(
+                (conversation) =>
+                  conversation.id ===
+                  newConversation.id
+              );
 
-          if (conversationAlreadyExists) {
-            return currentConversations;
+            if (
+              conversationAlreadyExists
+            ) {
+              return currentConversations;
+            }
+
+            return [
+              ...currentConversations,
+              {
+                ...newConversation,
+                messages: [],
+                messagesLoaded: false,
+                hasMoreMessages: false,
+                nextMessageCursor: null,
+              },
+            ];
           }
+        );
+      },
+      []
+    );
 
-          return [
-            ...currentConversations,
-            {
-              ...newConversation,
-              messages: [],
-              messagesLoaded: false,
-              hasMoreMessages: false,
-              nextMessageCursor: null,
-            },
-          ];
-        }
-      );
-    },
-    []
-  );
-
-  const receiveMessage = useCallback(
-    (newMessage) => {
+  const receiveMessage =
+    useCallback((newMessage) => {
       setConversations(
         (currentConversations) =>
           currentConversations.map(
@@ -267,205 +323,199 @@ function useConversations() {
                 return conversation;
               }
 
-              const messageAlreadyExists =
-                conversation.messages.some(
-                  (message) =>
-                    message.id ===
-                    newMessage.id
-                );
-
-              if (messageAlreadyExists) {
-                return conversation;
-              }
-
               return {
                 ...conversation,
 
-                messages: [
-                  ...conversation.messages,
-                  newMessage,
-                ],
+                messages:
+                  mergeMessages(
+                    conversation.messages,
+                    [newMessage]
+                  ),
               };
             }
           )
       );
-    },
-    []
-  );
+    }, []);
 
-  const loadOlderMessages = async () => {
-    if (!selectedConversation) {
-      return;
-    }
+  const loadOlderMessages =
+    async () => {
+      if (!selectedConversation) {
+        return;
+      }
 
-    if (
-      !selectedConversation.hasMoreMessages
-    ) {
-      return;
-    }
+      if (
+        !selectedConversation
+          .hasMoreMessages
+      ) {
+        return;
+      }
 
-    if (
-      !selectedConversation.nextMessageCursor
-    ) {
-      return;
-    }
+      if (
+        !selectedConversation
+          .nextMessageCursor
+      ) {
+        return;
+      }
 
-    if (olderMessagesLoading) {
-      return;
-    }
+      if (olderMessagesLoading) {
+        return;
+      }
 
-    try {
-      setOlderMessagesLoading(true);
-      setError(null);
+      try {
+        setOlderMessagesLoading(true);
+        setError(null);
 
-      const conversationId =
-        selectedConversation.id;
+        const conversationId =
+          selectedConversation.id;
 
-      const data = await getMessages(
-        conversationId,
-        selectedConversation.nextMessageCursor
-      );
+        const cursor =
+          selectedConversation
+            .nextMessageCursor;
 
-      setConversations(
-        (currentConversations) =>
-          currentConversations.map(
-            (conversation) => {
-              if (
-                conversation.id !==
-                conversationId
-              ) {
-                return conversation;
+        const data =
+          await getMessages(
+            conversationId,
+            cursor
+          );
+
+        setConversations(
+          (currentConversations) =>
+            currentConversations.map(
+              (conversation) => {
+                if (
+                  conversation.id !==
+                  conversationId
+                ) {
+                  return conversation;
+                }
+
+                return {
+                  ...conversation,
+
+                  messages:
+                    mergeMessages(
+                      data.messages,
+                      conversation.messages
+                    ),
+
+                  hasMoreMessages:
+                    data.hasMore,
+
+                  nextMessageCursor:
+                    data.nextCursor,
+                };
               }
-
-              const existingMessageIds =
-                new Set(
-                  conversation.messages.map(
-                    (message) => message.id
-                  )
-                );
-
-              const olderMessages =
-                data.messages.filter(
-                  (message) =>
-                    !existingMessageIds.has(
-                      message.id
-                    )
-                );
-
-              return {
-                ...conversation,
-
-                messages: [
-                  ...olderMessages,
-                  ...conversation.messages,
-                ],
-
-                hasMoreMessages:
-                  data.hasMore,
-
-                nextMessageCursor:
-                  data.nextCursor,
-              };
-            }
-          )
-      );
-    } catch (error) {
-      console.error(
-        "Failed to load older messages:",
-        error
-      );
-
-      setError(error.message);
-    } finally {
-      setOlderMessagesLoading(false);
-    }
-  };
-
-  const startTyping = useCallback(
-    (conversationId, userId) => {
-      setTypingUsers(
-        (currentTypingUsers) => {
-          const conversationTypingUsers =
-            currentTypingUsers[
-              conversationId
-            ] || [];
-
-          if (
-            conversationTypingUsers.includes(
-              userId
             )
-          ) {
-            return currentTypingUsers;
-          }
-
-          return {
-            ...currentTypingUsers,
-
-            [conversationId]: [
-              ...conversationTypingUsers,
-              userId,
-            ],
-          };
-        }
-      );
-    },
-    []
-  );
-
-  const stopTyping = useCallback(
-    (conversationId, userId) => {
-      setTypingUsers(
-        (currentTypingUsers) => {
-          const conversationTypingUsers =
-            currentTypingUsers[
-              conversationId
-            ] || [];
-
-          return {
-            ...currentTypingUsers,
-
-            [conversationId]:
-              conversationTypingUsers.filter(
-                (typingUserId) =>
-                  typingUserId !== userId
-              ),
-          };
-        }
-      );
-    },
-    []
-  );
-
-  const sendMessage = async (text) => {
-    if (!text.trim()) {
-      return;
-    }
-
-    if (!selectedConversationId) {
-      return;
-    }
-
-    try {
-      setError(null);
-
-      const newMessage =
-        await sendMessageRequest(
-          selectedConversationId,
-          {
-            text,
-          }
+        );
+      } catch (error) {
+        console.error(
+          "Failed to load older messages:",
+          error
         );
 
-      receiveMessage(newMessage);
-    } catch (error) {
-      console.error(
-        "Failed to send message:",
-        error
-      );
+        setError(error.message);
+      } finally {
+        setOlderMessagesLoading(false);
+      }
+    };
 
-      setError(error.message);
-    }
-  };
+  const startTyping =
+    useCallback(
+      (
+        conversationId,
+        userId
+      ) => {
+        setTypingUsers(
+          (currentTypingUsers) => {
+            const conversationTypingUsers =
+              currentTypingUsers[
+                conversationId
+              ] || [];
+
+            if (
+              conversationTypingUsers.includes(
+                userId
+              )
+            ) {
+              return currentTypingUsers;
+            }
+
+            return {
+              ...currentTypingUsers,
+
+              [conversationId]: [
+                ...conversationTypingUsers,
+                userId,
+              ],
+            };
+          }
+        );
+      },
+      []
+    );
+
+  const stopTyping =
+    useCallback(
+      (
+        conversationId,
+        userId
+      ) => {
+        setTypingUsers(
+          (currentTypingUsers) => {
+            const conversationTypingUsers =
+              currentTypingUsers[
+                conversationId
+              ] || [];
+
+            return {
+              ...currentTypingUsers,
+
+              [conversationId]:
+                conversationTypingUsers.filter(
+                  (typingUserId) =>
+                    typingUserId !==
+                    userId
+                ),
+            };
+          }
+        );
+      },
+      []
+    );
+
+  const sendMessage =
+    async (text) => {
+      if (!text.trim()) {
+        return;
+      }
+
+      if (!selectedConversationId) {
+        return;
+      }
+
+      try {
+        setError(null);
+
+        const newMessage =
+          await sendMessageRequest(
+            selectedConversationId,
+            {
+              text,
+            }
+          );
+
+        receiveMessage(
+          newMessage
+        );
+      } catch (error) {
+        console.error(
+          "Failed to send message:",
+          error
+        );
+
+        setError(error.message);
+      }
+    };
 
   return {
     conversations,
