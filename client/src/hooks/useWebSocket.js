@@ -1,0 +1,113 @@
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
+const WEBSOCKET_URL = "ws://localhost:3001";
+
+function useWebSocket(enabled, onEvent) {
+  const socketRef = useRef(null);
+
+  const [connected, setConnected] =
+    useState(false);
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    const socket = new WebSocket(
+      WEBSOCKET_URL
+    );
+
+    socketRef.current = socket;
+
+    socket.addEventListener("open", () => {
+      console.log(
+        "WebSocket connection opened"
+      );
+    });
+
+    socket.addEventListener(
+      "message",
+      (event) => {
+        try {
+          const message = JSON.parse(
+            event.data
+          );
+
+          if (
+            message.type ===
+            "connection_ready"
+          ) {
+            setConnected(true);
+          }
+
+          onEvent?.(message);
+        } catch (error) {
+          console.error(
+            "Failed to parse WebSocket message:",
+            error
+          );
+        }
+      }
+    );
+
+    socket.addEventListener("close", () => {
+      console.log(
+        "WebSocket connection closed"
+      );
+
+      setConnected(false);
+      socketRef.current = null;
+    });
+
+    socket.addEventListener(
+      "error",
+      (error) => {
+        console.error(
+          "WebSocket error:",
+          error
+        );
+      }
+    );
+
+    return () => {
+      socket.close();
+      socketRef.current = null;
+    };
+  }, [enabled, onEvent]);
+
+  const sendEvent = useCallback(
+    (type, data) => {
+      const socket = socketRef.current;
+
+      if (!socket) {
+        return;
+      }
+
+      if (
+        socket.readyState !== WebSocket.OPEN
+      ) {
+        return;
+      }
+
+      socket.send(
+        JSON.stringify({
+          type,
+          data,
+        })
+      );
+    },
+    []
+  );
+
+  return {
+    connected,
+    sendEvent,
+  };
+}
+
+export default useWebSocket;

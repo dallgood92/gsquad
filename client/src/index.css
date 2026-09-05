@@ -1,0 +1,203 @@
+/* ================================
+   Global
+================================ */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+
+/* ================================
+   App Layout
+================================ */
+
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+
+/* ================================
+   Conversation List
+================================ */
+
+.sidebar {
+  width: 260px;
+  padding: 20px;
+  border-right: 1px solid #ddd;
+}
+
+.conversation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.conversation {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.conversation:hover {
+  background: #eee;
+}
+
+.conversation.active {
+  background: #ddd;
+}
+
+
+/* ================================
+   Chat
+================================ */
+
+.chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.chat h2 {
+  margin: 0;
+  padding: 20px;
+  border-bottom: 1px solid #ddd;
+}
+
+
+/* ================================
+   Message List
+================================ */
+
+.message-list {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  max-width: 500px;
+  padding: 12px 16px;
+
+  background: #eee;
+  border-radius: 8px;
+}
+
+.message-sender {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.message-text {
+  font-size: 16px;
+}
+
+.message-own {
+  align-self: flex-end;
+  background: #dbeafe;
+}
+
+.message-other {
+  align-self: flex-start;
+}
+
+
+/* ================================
+   Message Input
+================================ */
+
+.message-input {
+  display: flex;
+  gap: 12px;
+  padding: 20px;
+  border-top: 1px solid #ddd;
+}
+
+.message-input input {
+  flex: 1;
+  padding: 12px;
+  font-size: 16px;
+}
+
+.message-input button {
+  padding: 12px 20px;
+}
+
+.typing-indicator {
+  min-height: 24px;
+  padding: 0 20px;
+  font-size: 14px;
+  font-style: italic;
+}
+
+/* ================================
+   Login Page
+================================ */
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 32px;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.login-card h1 {
+  margin-top: 0;
+}
+
+.login-card p {
+  margin-bottom: 24px;
+}
+
+.member-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 0 20px 12px;
+}
+
+.member-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.presence-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #aaa;
+}
+
+.presence-dot.online {
+  background: #22c55e;
+}
