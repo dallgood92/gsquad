@@ -38,10 +38,13 @@ function App() {
     addMemberToConversation,
     receiveConversation,
     receiveMessage,
+    loadOlderMessages,
     startTyping,
     stopTyping,
     sendMessage,
     loading: conversationsLoading,
+    messagesLoading,
+    olderMessagesLoading,
     error,
   } = useConversations();
 
@@ -272,8 +275,7 @@ function App() {
                         <span
                           className={
                             isUserOnline(
-                              membership
-                                .user.id
+                              membership.user.id
                             )
                               ? "presence-dot online"
                               : "presence-dot"
@@ -281,8 +283,7 @@ function App() {
                         />
 
                         {
-                          membership.user
-                            .name
+                          membership.user.name
                         }
                       </span>
                     )
@@ -304,22 +305,31 @@ function App() {
               <p>{error}</p>
             )}
 
-            <MessageList
-              messages={
-                selectedConversation.messages
-              }
-              currentUser={user}
-            />
+            {messagesLoading ? (
+              <p>Loading messages...</p>
+            ) : (
+              <MessageList
+                messages={
+                  selectedConversation.messages
+                }
+                currentUser={user}
+                hasMoreMessages={
+                  selectedConversation.hasMoreMessages
+                }
+                onLoadOlderMessages={
+                  loadOlderMessages
+                }
+                olderMessagesLoading={
+                  olderMessagesLoading
+                }
+              />
+            )}
 
             <div className="typing-indicator">
-              {typingNames.length >
-                0 && (
+              {typingNames.length > 0 && (
                 <span>
-                  {typingNames.join(
-                    ", "
-                  )}{" "}
-                  {typingNames.length ===
-                  1
+                  {typingNames.join(", ")}{" "}
+                  {typingNames.length === 1
                     ? "is"
                     : "are"}{" "}
                   typing...

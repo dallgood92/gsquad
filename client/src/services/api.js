@@ -155,6 +155,21 @@ export async function addConversationMember(
    Messages
 ================================ */
 
+export async function getMessages(conversationId) {
+  const response = await fetch(
+    `${API_URL}/conversations/${conversationId}/messages`,
+    {
+      credentials: "include",
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to load messages");
+  }
+
+  return response.json();
+}
+
 export async function sendMessage(conversationId, message) {
   const response = await fetch(
     `${API_URL}/conversations/${conversationId}/messages`,

@@ -1,4 +1,5 @@
 const express = require("express");
+
 const {
   createConversationSchema,
 } = require("../validation/conversationSchemas");
@@ -8,37 +9,35 @@ const router = express.Router();
 module.exports = function createConversationRoutes(prisma) {
   router.get("/", async (req, res) => {
     try {
-      const conversations = await prisma.conversation.findMany({
-        where: {
-          members: {
-            some: {
-              userId: req.userId,
+      const conversations =
+        await prisma.conversation.findMany({
+          where: {
+            members: {
+              some: {
+                userId: req.userId,
+              },
             },
           },
-        },
-        include: {
-          members: {
-            include: {
-              user: true,
+
+          include: {
+            members: {
+              include: {
+                user: true,
+              },
             },
           },
-          messages: {
-            include: {
-              sender: true,
-            },
-            orderBy: {
-              createdAt: "asc",
-            },
+
+          orderBy: {
+            createdAt: "asc",
           },
-        },
-        orderBy: {
-          createdAt: "asc",
-        },
-      });
+        });
 
       res.json(conversations);
     } catch (error) {
-      console.error("Failed to get conversations:", error);
+      console.error(
+        "Failed to get conversations:",
+        error
+      );
 
       res.status(500).json({
         error: "Failed to get conversations",
@@ -48,7 +47,10 @@ module.exports = function createConversationRoutes(prisma) {
 
   router.post("/", async (req, res) => {
     try {
-      const result = createConversationSchema.safeParse(req.body);
+      const result =
+        createConversationSchema.safeParse(
+          req.body
+        );
 
       if (!result.success) {
         return res.status(400).json({
@@ -59,35 +61,39 @@ module.exports = function createConversationRoutes(prisma) {
 
       const { name } = result.data;
 
-      const conversation = await prisma.conversation.create({
-        data: {
-          name,
-          members: {
-            create: {
-              userId: req.userId,
-            },
-          },
-        },
-        include: {
-          members: {
-            include: {
-              user: true,
-            },
-          },
-          messages: {
-            include: {
-              sender: true,
-            },
-          },
-        },
-      });
+      const conversation =
+        await prisma.conversation.create({
+          data: {
+            name,
 
-      res.status(201).json(conversation);
+            members: {
+              create: {
+                userId: req.userId,
+              },
+            },
+          },
+
+          include: {
+            members: {
+              include: {
+                user: true,
+              },
+            },
+          },
+        });
+
+      res
+        .status(201)
+        .json(conversation);
     } catch (error) {
-      console.error("Failed to create conversation:", error);
+      console.error(
+        "Failed to create conversation:",
+        error
+      );
 
       res.status(500).json({
-        error: "Failed to create conversation",
+        error:
+          "Failed to create conversation",
       });
     }
   });

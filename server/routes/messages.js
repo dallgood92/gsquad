@@ -6,10 +6,111 @@ const {
 
 const router = express.Router();
 
+const MESSAGE_PAGE_SIZE = 30;
+
 module.exports = function createMessageRoutes(
   prisma,
   redis
 ) {
+  router.get(
+    "/:conversationId/messages",
+    async (req, res) => {
+      try {
+        const conversationId = Number(
+          req.params.conversationId
+        );
+
+        if (!Number.isInteger(conversationId)) {
+          return res.status(400).json({
+            error: "Invalid conversation ID",
+          });
+        }
+
+        const before = req.query.before
+          ? Number(req.query.before)
+          : null;
+
+        if (
+          before !== null &&
+          !Number.isInteger(before)
+        ) {
+          return res.status(400).json({
+            error: "Invalid message cursor",
+          });
+        }
+
+        const membership =
+          await prisma.conversationMember.findUnique({
+            where: {
+              userId_conversationId: {
+                userId: req.userId,
+                conversationId,
+              },
+            },
+          });
+
+        if (!membership) {
+          return res.status(403).json({
+            error:
+              "You are not a member of this conversation",
+          });
+        }
+
+        const messages =
+          await prisma.message.findMany({
+            where: {
+              conversationId,
+
+              ...(before && {
+                id: {
+                  lt: before,
+                },
+              }),
+            },
+
+            include: {
+              sender: true,
+            },
+
+            orderBy: {
+              id: "desc",
+            },
+
+            take: MESSAGE_PAGE_SIZE + 1,
+          });
+
+        const hasMore =
+          messages.length > MESSAGE_PAGE_SIZE;
+
+        if (hasMore) {
+          messages.pop();
+        }
+
+        messages.reverse();
+
+        const nextCursor =
+          hasMore && messages.length > 0
+            ? messages[0].id
+            : null;
+
+        res.json({
+          messages,
+          hasMore,
+          nextCursor,
+        });
+      } catch (error) {
+        console.error(
+          "Failed to get messages:",
+          error
+        );
+
+        res.status(500).json({
+          error: "Failed to get messages",
+        });
+      }
+    }
+  );
+
   router.post(
     "/:conversationId/messages",
     async (req, res) => {
@@ -18,9 +119,7 @@ module.exports = function createMessageRoutes(
           req.params.conversationId
         );
 
-        if (
-          !Number.isInteger(conversationId)
-        ) {
+        if (!Number.isInteger(conversationId)) {
           return res.status(400).json({
             error: "Invalid conversation ID",
           });
@@ -41,16 +140,14 @@ module.exports = function createMessageRoutes(
         const { text } = result.data;
 
         const membership =
-          await prisma.conversationMember.findUnique(
-            {
-              where: {
-                userId_conversationId: {
-                  userId: req.userId,
-                  conversationId,
-                },
+          await prisma.conversationMember.findUnique({
+            where: {
+              userId_conversationId: {
+                userId: req.userId,
+                conversationId,
               },
-            }
-          );
+            },
+          });
 
         if (!membership) {
           return res.status(403).json({
@@ -73,22 +170,18 @@ module.exports = function createMessageRoutes(
           });
 
         const members =
-          await prisma.conversationMember.findMany(
-            {
-              where: {
-                conversationId,
-              },
+          await prisma.conversationMember.findMany({
+            where: {
+              conversationId,
+            },
 
-              select: {
-                userId: true,
-              },
-            }
-          );
+            select: {
+              userId: true,
+            },
+          });
 
         const recipientUserIds = members
-          .map(
-            (member) => member.userId
-          )
+          .map((member) => member.userId)
           .filter(
             (userId) =>
               userId !== req.userId
