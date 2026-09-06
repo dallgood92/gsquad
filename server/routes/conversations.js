@@ -162,6 +162,15 @@ module.exports = function createConversationRoutes(
           });
         }
 
+        if (
+          membership.lastReadMessageId !==
+            null &&
+          messageId <=
+            membership.lastReadMessageId
+        ) {
+          return res.json(membership);
+        }
+
         const updatedMembership =
           await prisma.conversationMember.update({
             where: {
