@@ -46,7 +46,7 @@ function App() {
     messagesLoading,
     olderMessagesLoading,
     error,
-  } = useConversations();
+  } = useConversations(user?.id);
 
   const {
     setInitialPresence,

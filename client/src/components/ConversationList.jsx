@@ -6,17 +6,24 @@ function ConversationList({
   onSelectConversation,
   onCreateConversation,
 }) {
-  const [name, setName] = useState("");
-  const [showForm, setShowForm] = useState(false);
+  const [name, setName] =
+    useState("");
 
-  const handleSubmit = async (event) => {
+  const [showForm, setShowForm] =
+    useState(false);
+
+  const handleSubmit = async (
+    event
+  ) => {
     event.preventDefault();
 
     if (!name.trim()) {
       return;
     }
 
-    await onCreateConversation(name);
+    await onCreateConversation(
+      name
+    );
 
     setName("");
     setShowForm(false);
@@ -29,7 +36,11 @@ function ConversationList({
 
         <button
           type="button"
-          onClick={() => setShowForm((current) => !current)}
+          onClick={() =>
+            setShowForm(
+              (current) => !current
+            )
+          }
         >
           + New
         </button>
@@ -43,7 +54,11 @@ function ConversationList({
           <input
             type="text"
             value={name}
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) =>
+              setName(
+                event.target.value
+              )
+            }
             placeholder="Conversation name"
             autoFocus
           />
@@ -55,21 +70,47 @@ function ConversationList({
       )}
 
       <div className="conversation-list">
-        {conversations.map((conversation) => (
-          <button
-            key={conversation.id}
-            className={
-              conversation.id === selectedConversationId
-                ? "conversation active"
-                : "conversation"
-            }
-            onClick={() =>
-              onSelectConversation(conversation.id)
-            }
-          >
-            {conversation.name}
-          </button>
-        ))}
+        {conversations.map(
+          (conversation) => (
+            <button
+              key={conversation.id}
+              className={
+                conversation.id ===
+                selectedConversationId
+                  ? "conversation active"
+                  : "conversation"
+              }
+              onClick={() =>
+                onSelectConversation(
+                  conversation.id
+                )
+              }
+            >
+              <div>
+                {conversation.name}
+
+                {conversation.unreadCount >
+                  0 &&
+                  ` (${conversation.unreadCount})`}
+              </div>
+
+              {conversation.lastMessage && (
+                <div>
+                  {
+                    conversation
+                      .lastMessage
+                      .sender?.name
+                  }
+                  :{" "}
+                  {
+                    conversation
+                      .lastMessage.text
+                  }
+                </div>
+              )}
+            </button>
+          )
+        )}
       </div>
     </aside>
   );

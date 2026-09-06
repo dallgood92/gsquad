@@ -6,6 +6,25 @@ import {
 
 const LOAD_MORE_THRESHOLD = 100;
 
+function formatMessageTime(
+  createdAt
+) {
+  if (!createdAt) {
+    return "";
+  }
+
+  const date =
+    new Date(createdAt);
+
+  return new Intl.DateTimeFormat(
+    undefined,
+    {
+      hour: "numeric",
+      minute: "2-digit",
+    }
+  ).format(date);
+}
+
 function MessageList({
   messages,
   currentUser,
@@ -13,7 +32,8 @@ function MessageList({
   onLoadOlderMessages,
   olderMessagesLoading,
 }) {
-  const listRef = useRef(null);
+  const listRef =
+    useRef(null);
 
   const previousMessagesRef =
     useRef([]);
@@ -21,29 +41,57 @@ function MessageList({
   const previousScrollHeightRef =
     useRef(null);
 
-  const handleLoadOlder = async () => {
-    const list = listRef.current;
+  const loadingOlderRef =
+    useRef(false);
 
-    if (!list) {
-      return;
-    }
+  const handleLoadOlder =
+    async () => {
+      const list =
+        listRef.current;
 
-    if (!hasMoreMessages) {
-      return;
-    }
+      if (!list) {
+        return;
+      }
 
-    if (olderMessagesLoading) {
-      return;
-    }
+      if (!hasMoreMessages) {
+        return;
+      }
 
-    previousScrollHeightRef.current =
-      list.scrollHeight;
+      if (
+        olderMessagesLoading
+      ) {
+        return;
+      }
 
-    await onLoadOlderMessages();
-  };
+      if (
+        loadingOlderRef.current
+      ) {
+        return;
+      }
+
+      loadingOlderRef.current =
+        true;
+
+      previousScrollHeightRef.current =
+        list.scrollHeight;
+
+      try {
+        const loaded =
+          await onLoadOlderMessages();
+
+        if (!loaded) {
+          previousScrollHeightRef.current =
+            null;
+        }
+      } finally {
+        loadingOlderRef.current =
+          false;
+      }
+    };
 
   const handleScroll = () => {
-    const list = listRef.current;
+    const list =
+      listRef.current;
 
     if (!list) {
       return;
@@ -58,7 +106,8 @@ function MessageList({
   };
 
   useLayoutEffect(() => {
-    const list = listRef.current;
+    const list =
+      listRef.current;
 
     if (!list) {
       return;
@@ -78,7 +127,8 @@ function MessageList({
         newScrollHeight -
         previousScrollHeight;
 
-      list.scrollTop += addedHeight;
+      list.scrollTop +=
+        addedHeight;
 
       previousScrollHeightRef.current =
         null;
@@ -91,7 +141,8 @@ function MessageList({
 
     const previousLastMessage =
       previousMessages[
-        previousMessages.length - 1
+        previousMessages.length -
+          1
       ];
 
     const currentLastMessage =
@@ -127,30 +178,41 @@ function MessageList({
         </p>
       )}
 
-      {messages.map((message) => {
-        const isOwnMessage =
-          message.senderId ===
-          currentUser.id;
+      {messages.map(
+        (message) => {
+          const isOwnMessage =
+            message.senderId ===
+            currentUser.id;
 
-        return (
-          <div
-            key={message.id}
-            className={`message ${
-              isOwnMessage
-                ? "message-own"
-                : "message-other"
-            }`}
-          >
-            <span className="message-sender">
-              {message.sender.name}
-            </span>
+          return (
+            <div
+              key={message.id}
+              className={`message ${
+                isOwnMessage
+                  ? "message-own"
+                  : "message-other"
+              }`}
+            >
+              <span className="message-sender">
+                {
+                  message.sender
+                    .name
+                }
+              </span>
 
-            <span className="message-text">
-              {message.text}
-            </span>
-          </div>
-        );
-      })}
+              <span className="message-text">
+                {message.text}
+              </span>
+
+              <span>
+                {formatMessageTime(
+                  message.createdAt
+                )}
+              </span>
+            </div>
+          );
+        }
+      )}
     </div>
   );
 }

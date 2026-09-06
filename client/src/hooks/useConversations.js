@@ -9,14 +9,22 @@ import {
   createConversation as createConversationRequest,
   getConversations,
   getMessages,
+  markConversationRead as markConversationReadRequest,
   sendMessage as sendMessageRequest,
 } from "../services/api";
 
-function mergeMessages(...messageGroups) {
-  const messagesById = new Map();
+function mergeMessages(
+  ...messageGroups
+) {
+  const messagesById =
+    new Map();
 
-  for (const messages of messageGroups) {
-    for (const message of messages) {
+  for (
+    const messages of messageGroups
+  ) {
+    for (
+      const message of messages
+    ) {
       messagesById.set(
         message.id,
         message
@@ -27,26 +35,71 @@ function mergeMessages(...messageGroups) {
   return Array.from(
     messagesById.values()
   ).sort(
-    (firstMessage, secondMessage) =>
+    (
+      firstMessage,
+      secondMessage
+    ) =>
       firstMessage.id -
       secondMessage.id
   );
 }
 
-function useConversations() {
-  const [conversations, setConversations] =
-    useState([]);
+function sortConversations(
+  conversations
+) {
+  return [...conversations].sort(
+    (
+      firstConversation,
+      secondConversation
+    ) => {
+      const firstActivity =
+        firstConversation
+          .lastMessage?.id ?? 0;
+
+      const secondActivity =
+        secondConversation
+          .lastMessage?.id ?? 0;
+
+      if (
+        firstActivity ===
+        secondActivity
+      ) {
+        return (
+          secondConversation.id -
+          firstConversation.id
+        );
+      }
+
+      return (
+        secondActivity -
+        firstActivity
+      );
+    }
+  );
+}
+
+function useConversations(
+  currentUserId
+) {
+  const [
+    conversations,
+    setConversations,
+  ] = useState([]);
 
   const [
     selectedConversationId,
     setSelectedConversationId,
   ] = useState(null);
 
-  const [typingUsers, setTypingUsers] =
-    useState({});
+  const [
+    typingUsers,
+    setTypingUsers,
+  ] = useState({});
 
-  const [loading, setLoading] =
-    useState(true);
+  const [
+    loading,
+    setLoading,
+  ] = useState(false);
 
   const [
     messagesLoading,
@@ -58,11 +111,16 @@ function useConversations() {
     setOlderMessagesLoading,
   ] = useState(false);
 
-  const [error, setError] =
-    useState(null);
+  const [
+    error,
+    setError,
+  ] = useState(null);
 
   const conversationsRef =
     useRef([]);
+
+  const selectedConversationIdRef =
+    useRef(null);
 
   useEffect(() => {
     conversationsRef.current =
@@ -70,6 +128,27 @@ function useConversations() {
   }, [conversations]);
 
   useEffect(() => {
+    selectedConversationIdRef.current =
+      selectedConversationId;
+  }, [selectedConversationId]);
+
+  useEffect(() => {
+    if (!currentUserId) {
+      setConversations([]);
+      setSelectedConversationId(
+        null
+      );
+      setTypingUsers({});
+      setLoading(false);
+      setMessagesLoading(false);
+      setOlderMessagesLoading(
+        false
+      );
+      setError(null);
+
+      return;
+    }
+
     async function loadConversations() {
       try {
         setLoading(true);
@@ -82,20 +161,47 @@ function useConversations() {
           data.map(
             (conversation) => ({
               ...conversation,
+
               messages: [],
-              messagesLoaded: false,
-              hasMoreMessages: false,
-              nextMessageCursor: null,
+
+              messagesLoaded:
+                false,
+
+              hasMoreMessages:
+                false,
+
+              nextMessageCursor:
+                null,
+
+              unreadCount:
+                conversation.unreadCount ??
+                0,
+
+              lastMessage:
+                conversation.lastMessage ??
+                null,
             })
           );
 
+        const sortedConversations =
+          sortConversations(
+            conversationsWithMessageState
+          );
+
         setConversations(
-          conversationsWithMessageState
+          sortedConversations
         );
 
-        if (data.length > 0) {
+        if (
+          sortedConversations.length >
+          0
+        ) {
           setSelectedConversationId(
-            data[0].id
+            sortedConversations[0].id
+          );
+        } else {
+          setSelectedConversationId(
+            null
           );
         }
       } catch (error) {
@@ -104,14 +210,16 @@ function useConversations() {
           error
         );
 
-        setError(error.message);
+        setError(
+          error.message
+        );
       } finally {
         setLoading(false);
       }
     }
 
     loadConversations();
-  }, []);
+  }, [currentUserId]);
 
   const selectedConversation =
     conversations.find(
@@ -125,8 +233,90 @@ function useConversations() {
       selectedConversationId
     ] || [];
 
+  const markConversationRead =
+    useCallback(
+      async (
+        conversationId,
+        messageId
+      ) => {
+        if (!currentUserId) {
+          return;
+        }
+
+        if (!messageId) {
+          return;
+        }
+
+        try {
+          const membership =
+            await markConversationReadRequest(
+              conversationId,
+              messageId
+            );
+
+          setConversations(
+            (
+              currentConversations
+            ) =>
+              currentConversations.map(
+                (
+                  conversation
+                ) => {
+                  if (
+                    conversation.id !==
+                    conversationId
+                  ) {
+                    return conversation;
+                  }
+
+                  return {
+                    ...conversation,
+
+                    unreadCount:
+                      0,
+
+                    members:
+                      conversation.members.map(
+                        (
+                          currentMembership
+                        ) => {
+                          if (
+                            currentMembership.userId !==
+                            currentUserId
+                          ) {
+                            return currentMembership;
+                          }
+
+                          return {
+                            ...currentMembership,
+
+                            lastReadMessageId:
+                              membership.lastReadMessageId,
+                          };
+                        }
+                      ),
+                  };
+                }
+              )
+          );
+        } catch (error) {
+          console.error(
+            "Failed to mark conversation read:",
+            error
+          );
+        }
+      },
+      [currentUserId]
+    );
+
   useEffect(() => {
-    if (!selectedConversationId) {
+    if (!currentUserId) {
+      return;
+    }
+
+    if (
+      !selectedConversationId
+    ) {
       return;
     }
 
@@ -141,13 +331,31 @@ function useConversations() {
       return;
     }
 
-    if (conversation.messagesLoaded) {
+    if (
+      conversation.messagesLoaded
+    ) {
+      const lastMessage =
+        conversation.messages[
+          conversation.messages
+            .length - 1
+        ];
+
+      if (lastMessage) {
+        markConversationRead(
+          conversation.id,
+          lastMessage.id
+        );
+      }
+
       return;
     }
 
     async function loadMessages() {
       try {
-        setMessagesLoading(true);
+        setMessagesLoading(
+          true
+        );
+
         setError(null);
 
         const conversationId =
@@ -159,7 +367,9 @@ function useConversations() {
           );
 
         setConversations(
-          (currentConversations) =>
+          (
+            currentConversations
+          ) =>
             currentConversations.map(
               (conversation) => {
                 if (
@@ -178,31 +388,55 @@ function useConversations() {
                       conversation.messages
                     ),
 
-                  messagesLoaded: true,
+                  messagesLoaded:
+                    true,
 
                   hasMoreMessages:
                     data.hasMore,
 
                   nextMessageCursor:
                     data.nextCursor,
+
+                  unreadCount: 0,
                 };
               }
             )
         );
+
+        const lastMessage =
+          data.messages[
+            data.messages.length -
+              1
+          ];
+
+        if (lastMessage) {
+          await markConversationRead(
+            conversationId,
+            lastMessage.id
+          );
+        }
       } catch (error) {
         console.error(
           "Failed to load messages:",
           error
         );
 
-        setError(error.message);
+        setError(
+          error.message
+        );
       } finally {
-        setMessagesLoading(false);
+        setMessagesLoading(
+          false
+        );
       }
     }
 
     loadMessages();
-  }, [selectedConversationId]);
+  }, [
+    currentUserId,
+    selectedConversationId,
+    markConversationRead,
+  ]);
 
   const selectConversation = (
     conversationId
@@ -229,17 +463,30 @@ function useConversations() {
         const conversationWithMessageState =
           {
             ...newConversation,
+
             messages: [],
+
             messagesLoaded: true,
-            hasMoreMessages: false,
-            nextMessageCursor: null,
+
+            hasMoreMessages:
+              false,
+
+            nextMessageCursor:
+              null,
+
+            unreadCount: 0,
+
+            lastMessage: null,
           };
 
         setConversations(
-          (currentConversations) => [
-            ...currentConversations,
-            conversationWithMessageState,
-          ]
+          (
+            currentConversations
+          ) =>
+            sortConversations([
+              ...currentConversations,
+              conversationWithMessageState,
+            ])
         );
 
         setSelectedConversationId(
@@ -251,45 +498,52 @@ function useConversations() {
           error
         );
 
-        setError(error.message);
+        setError(
+          error.message
+        );
       }
     };
 
-  const addMemberToConversation = (
-    membership
-  ) => {
-    setConversations(
-      (currentConversations) =>
-        currentConversations.map(
-          (conversation) => {
-            if (
-              conversation.id ===
-              membership.conversationId
-            ) {
-              return {
-                ...conversation,
+  const addMemberToConversation =
+    (membership) => {
+      setConversations(
+        (
+          currentConversations
+        ) =>
+          currentConversations.map(
+            (conversation) => {
+              if (
+                conversation.id ===
+                membership.conversationId
+              ) {
+                return {
+                  ...conversation,
 
-                members: [
-                  ...conversation.members,
-                  membership,
-                ],
-              };
+                  members: [
+                    ...conversation.members,
+                    membership,
+                  ],
+                };
+              }
+
+              return conversation;
             }
-
-            return conversation;
-          }
-        )
-    );
-  };
+          )
+      );
+    };
 
   const receiveConversation =
     useCallback(
       (newConversation) => {
         setConversations(
-          (currentConversations) => {
+          (
+            currentConversations
+          ) => {
             const conversationAlreadyExists =
               currentConversations.some(
-                (conversation) =>
+                (
+                  conversation
+                ) =>
                   conversation.id ===
                   newConversation.id
               );
@@ -300,16 +554,32 @@ function useConversations() {
               return currentConversations;
             }
 
-            return [
+            return sortConversations([
               ...currentConversations,
+
               {
                 ...newConversation,
+
                 messages: [],
-                messagesLoaded: false,
-                hasMoreMessages: false,
-                nextMessageCursor: null,
+
+                messagesLoaded:
+                  false,
+
+                hasMoreMessages:
+                  false,
+
+                nextMessageCursor:
+                  null,
+
+                unreadCount:
+                  newConversation.unreadCount ??
+                  0,
+
+                lastMessage:
+                  newConversation.lastMessage ??
+                  null,
               },
-            ];
+            ]);
           }
         );
       },
@@ -317,58 +587,98 @@ function useConversations() {
     );
 
   const receiveMessage =
-    useCallback((newMessage) => {
-      setConversations(
-        (currentConversations) =>
-          currentConversations.map(
-            (conversation) => {
-              if (
-                conversation.id !==
-                newMessage.conversationId
-              ) {
-                return conversation;
-              }
+    useCallback(
+      (newMessage) => {
+        const isSelectedConversation =
+          selectedConversationIdRef.current ===
+          newMessage.conversationId;
 
-              return {
-                ...conversation,
+        setConversations(
+          (
+            currentConversations
+          ) => {
+            const updatedConversations =
+              currentConversations.map(
+                (conversation) => {
+                  if (
+                    conversation.id !==
+                    newMessage.conversationId
+                  ) {
+                    return conversation;
+                  }
 
-                messages:
-                  mergeMessages(
-                    conversation.messages,
-                    [newMessage]
-                  ),
-              };
-            }
-          )
-      );
-    }, []);
+                  return {
+                    ...conversation,
+
+                    messages:
+                      mergeMessages(
+                        conversation.messages,
+                        [newMessage]
+                      ),
+
+                    lastMessage:
+                      newMessage,
+
+                    unreadCount:
+                      isSelectedConversation
+                        ? 0
+                        : conversation.unreadCount +
+                          1,
+                  };
+                }
+              );
+
+            return sortConversations(
+              updatedConversations
+            );
+          }
+        );
+
+        if (
+          isSelectedConversation
+        ) {
+          markConversationRead(
+            newMessage.conversationId,
+            newMessage.id
+          );
+        }
+      },
+      [markConversationRead]
+    );
 
   const loadOlderMessages =
     async () => {
-      if (!selectedConversation) {
-        return;
+      if (
+        !selectedConversation
+      ) {
+        return false;
       }
 
       if (
         !selectedConversation
           .hasMoreMessages
       ) {
-        return;
+        return false;
       }
 
       if (
         !selectedConversation
           .nextMessageCursor
       ) {
-        return;
+        return false;
       }
 
-      if (olderMessagesLoading) {
-        return;
+      if (
+        olderMessagesLoading
+      ) {
+        return false;
       }
 
       try {
-        setOlderMessagesLoading(true);
+        setOlderMessagesLoading(
+          true
+        );
+
         setError(null);
 
         const conversationId =
@@ -385,7 +695,9 @@ function useConversations() {
           );
 
         setConversations(
-          (currentConversations) =>
+          (
+            currentConversations
+          ) =>
             currentConversations.map(
               (conversation) => {
                 if (
@@ -413,15 +725,23 @@ function useConversations() {
               }
             )
         );
+
+        return true;
       } catch (error) {
         console.error(
           "Failed to load older messages:",
           error
         );
 
-        setError(error.message);
+        setError(
+          error.message
+        );
+
+        return false;
       } finally {
-        setOlderMessagesLoading(false);
+        setOlderMessagesLoading(
+          false
+        );
       }
     };
 
@@ -432,7 +752,9 @@ function useConversations() {
         userId
       ) => {
         setTypingUsers(
-          (currentTypingUsers) => {
+          (
+            currentTypingUsers
+          ) => {
             const conversationTypingUsers =
               currentTypingUsers[
                 conversationId
@@ -467,7 +789,9 @@ function useConversations() {
         userId
       ) => {
         setTypingUsers(
-          (currentTypingUsers) => {
+          (
+            currentTypingUsers
+          ) => {
             const conversationTypingUsers =
               currentTypingUsers[
                 conversationId
@@ -478,7 +802,9 @@ function useConversations() {
 
               [conversationId]:
                 conversationTypingUsers.filter(
-                  (typingUserId) =>
+                  (
+                    typingUserId
+                  ) =>
                     typingUserId !==
                     userId
                 ),
@@ -495,7 +821,9 @@ function useConversations() {
         return;
       }
 
-      if (!selectedConversationId) {
+      if (
+        !selectedConversationId
+      ) {
         return;
       }
 
@@ -519,7 +847,9 @@ function useConversations() {
           error
         );
 
-        setError(error.message);
+        setError(
+          error.message
+        );
       }
     };
 
