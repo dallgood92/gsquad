@@ -285,7 +285,9 @@ module.exports =
           });
           const normalizedText = text.toLocaleLowerCase();
           const mentionedUserIds = mentionableMembers
-            .filter(({ user }) => normalizedText.includes(`@${user.name.toLocaleLowerCase()}`))
+            .filter(({ user, notificationsMuted }) =>
+              !notificationsMuted && normalizedText.includes(`@${user.name.toLocaleLowerCase()}`)
+            )
             .map(({ userId }) => userId);
 
           if (mentionedUserIds.length) {

@@ -24,6 +24,7 @@ import {
   renameConversation,
   removeConversationMember,
   updateConversationMemberRole,
+  updateNotificationPreferences,
 } from "./services/api";
 
 function App() {
@@ -100,6 +101,16 @@ function App() {
     } catch (requestError) {
       window.alert(requestError.message);
     }
+  };
+
+  const handleToggleNotifications = async () => {
+    if (!selectedConversation || !currentMembership) return;
+    await refreshAfterMemberChange(() =>
+      updateNotificationPreferences(
+        selectedConversation.id,
+        !currentMembership.notificationsMuted
+      )
+    );
   };
 
   const {
@@ -366,6 +377,7 @@ function App() {
         onCreateConversation={
           createConversation
         }
+        currentUserId={user.id}
       />
 
       <main className="chat">
@@ -489,6 +501,9 @@ function App() {
               }}>Leave</button>
               <button type="button" onClick={() => setShowPinnedMessages(true)}>
                 Pinned messages
+              </button>
+              <button type="button" onClick={handleToggleNotifications}>
+                {currentMembership.notificationsMuted ? "Unmute notifications" : "Mute notifications"}
               </button>
             </div>
 

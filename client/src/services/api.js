@@ -202,6 +202,17 @@ export async function updateConversationMemberRole(conversationId, userId, role)
   return response.json();
 }
 
+export async function updateNotificationPreferences(conversationId, notificationsMuted) {
+  const response = await fetch(`${API_URL}/conversations/${conversationId}/notification-preferences`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ notificationsMuted }),
+  });
+  if (!response.ok) throw new Error("Failed to update notification preferences");
+  return response.json();
+}
+
 export async function getMessages(
   conversationId,
   before = null

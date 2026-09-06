@@ -54,6 +54,8 @@ Conversation List
   background: #ddd;
 }
 
+.conversation-muted { color: #666; font-size: 12px; }
+
 /* ================================
 Chat
 ================================ */

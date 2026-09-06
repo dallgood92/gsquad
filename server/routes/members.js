@@ -204,5 +204,28 @@ module.exports = function createMemberRoutes(
     }
   });
 
+  router.patch("/:conversationId/notification-preferences", async (req, res) => {
+    try {
+      const conversationId = Number(req.params.conversationId);
+      const notificationsMuted = req.body.notificationsMuted;
+      if (!Number.isInteger(conversationId) || typeof notificationsMuted !== "boolean") {
+        return res.status(400).json({ error: "Invalid notification preferences" });
+      }
+      const existing = await prisma.conversationMember.findUnique({
+        where: { userId_conversationId: { userId: req.userId, conversationId } },
+      });
+      if (!existing) return res.status(403).json({ error: "You are not a member of this conversation" });
+      const membership = await prisma.conversationMember.update({
+        where: { userId_conversationId: { userId: req.userId, conversationId } },
+        data: { notificationsMuted },
+        include: { user: true },
+      });
+      res.json(membership);
+    } catch (error) {
+      console.error("Failed to update notification preferences:", error);
+      res.status(500).json({ error: "Failed to update notification preferences" });
+    }
+  });
+
   return router;
 };

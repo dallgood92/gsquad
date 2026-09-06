@@ -5,6 +5,7 @@ function ConversationList({
   selectedConversationId,
   onSelectConversation,
   onCreateConversation,
+  currentUserId,
 }) {
   const [name, setName] =
     useState("");
@@ -88,6 +89,10 @@ function ConversationList({
             >
               <div>
                 {conversation.name}
+
+                {conversation.members.find((membership) => membership.userId === currentUserId)?.notificationsMuted && (
+                  <span className="conversation-muted" title="Notifications muted"> · Muted</span>
+                )}
 
                 {conversation.unreadCount >
                   0 &&

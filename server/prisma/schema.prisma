@@ -32,10 +32,11 @@ model Conversation {
 }
 
 model ConversationMember {
-  userId            Int
-  conversationId    Int
-  lastReadMessageId Int?
-  role              MembershipRole @default(MEMBER)
+  userId             Int
+  conversationId     Int
+  lastReadMessageId  Int?
+  role               MembershipRole @default(MEMBER)
+  notificationsMuted Boolean        @default(false)
 
   user         User         @relation(fields: [userId], references: [id])
   conversation Conversation @relation(fields: [conversationId], references: [id])
