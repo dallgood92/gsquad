@@ -10,8 +10,11 @@ function MessageInput({
   onTypingStop,
   replyToMessage,
   onCancelReply,
+  draftKey,
 }) {
-  const [message, setMessage] = useState("");
+  const storageKey = `message-draft:${draftKey}`;
+  const [message, setMessage] = useState(() => localStorage.getItem(storageKey) ?? "");
+  const [sending, setSending] = useState(false);
 
   const typingTimeoutRef = useRef(null);
   const isTypingRef = useRef(false);
@@ -30,6 +33,8 @@ function MessageInput({
     const value = event.target.value;
 
     setMessage(value);
+    if (value) localStorage.setItem(storageKey, value);
+    else localStorage.removeItem(storageKey);
 
     if (!value.trim()) {
       clearTimeout(typingTimeoutRef.current);
@@ -60,10 +65,17 @@ function MessageInput({
     clearTimeout(typingTimeoutRef.current);
     stopTyping();
 
-    await onSendMessage(message, replyToMessage?.id ?? null);
-
-    setMessage("");
-    onCancelReply?.();
+    try {
+      setSending(true);
+      const sentMessage = await onSendMessage(message, replyToMessage?.id ?? null);
+      if (sentMessage) {
+        setMessage("");
+        localStorage.removeItem(storageKey);
+        onCancelReply?.();
+      }
+    } finally {
+      setSending(false);
+    }
   };
 
   useEffect(() => {
@@ -86,15 +98,25 @@ function MessageInput({
       className="message-input"
       onSubmit={handleSubmit}
     >
-      <input
-        type="text"
+      <textarea
         value={message}
         onChange={handleChange}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            event.currentTarget.form.requestSubmit();
+          }
+        }}
         placeholder="Type a message..."
+        maxLength={2000}
+        rows={1}
+        disabled={sending}
       />
 
-      <button type="submit">
-        Send
+      <span className="draft-status">{message ? `Draft · ${message.length}/2000` : ""}</span>
+
+      <button type="submit" disabled={sending || !message.trim()}>
+        {sending ? "Sending..." : "Send"}
       </button>
     </form>
     </div>

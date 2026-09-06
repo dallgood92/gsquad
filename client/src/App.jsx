@@ -539,6 +539,8 @@ function App() {
             </div>
 
             <MessageInput
+              key={`conversation:${selectedConversation.id}`}
+              draftKey={`conversation:${selectedConversation.id}`}
               onSendMessage={
                 sendMessage
               }
@@ -551,6 +553,7 @@ function App() {
             />
             {threadMessage && (
               <ThreadPanel
+                key={`thread:${selectedConversation.id}:${threadMessage.id}`}
                 conversationId={selectedConversation.id}
                 rootMessage={threadMessage}
                 liveMessages={selectedConversation.messages}

@@ -27,6 +27,7 @@ function ThreadPanel({ conversationId, rootMessage, liveMessages, onClose, onSen
   const sendReply = async (text) => {
     const reply = await onSendMessage(text, rootMessage.id);
     if (reply) setThread((current) => ({ ...(current ?? rootMessage), replies: [...(current?.replies ?? []), reply] }));
+    return reply;
   };
 
   return (
@@ -38,7 +39,7 @@ function ThreadPanel({ conversationId, rootMessage, liveMessages, onClose, onSen
         {error && <p>{error}</p>}
         {replies.map((reply) => <ThreadMessage key={reply.id} message={reply} />)}
       </div>
-      <MessageInput onSendMessage={sendReply} />
+      <MessageInput onSendMessage={sendReply} draftKey={`thread:${conversationId}:${rootMessage.id}`} />
     </aside>
   );
 }
