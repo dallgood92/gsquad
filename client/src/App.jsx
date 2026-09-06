@@ -393,6 +393,10 @@ function App() {
           createConversation
         }
         currentUserId={user.id}
+        onDirectConversationCreated={(conversation) => {
+          receiveConversation(conversation);
+          handleSelectConversation(conversation.id);
+        }}
       />
 
       <main className="chat">
@@ -457,10 +461,12 @@ function App() {
               <div>
                 <h2>
                   {
-                    selectedConversation.name
+                    selectedConversation.type === "DIRECT"
+                      ? selectedConversation.members.find((membership) => membership.userId !== user.id)?.user.name ?? selectedConversation.name
+                      : selectedConversation.name
                   }
                 </h2>
-                {isConversationAdmin && (
+                {isConversationAdmin && selectedConversation.type !== "DIRECT" && (
                   <button type="button" onClick={() => {
                     const name = window.prompt("Conversation name", selectedConversation.name)?.trim();
                     if (name && name !== selectedConversation.name) refreshAfterMemberChange(() => renameConversation(selectedConversation.id, name));
@@ -508,19 +514,19 @@ function App() {
                 </div>
               </div>
 
-              {isConversationAdmin && (
+              {isConversationAdmin && selectedConversation.type !== "DIRECT" && (
                 <AddMember
                   conversationId={selectedConversation.id}
                   onMemberAdded={addMemberToConversation}
                 />
               )}
-              <button type="button" onClick={() => {
+              {selectedConversation.type !== "DIRECT" && <button type="button" onClick={() => {
                 if (window.confirm("Leave this conversation?")) {
                   removeConversationMember(selectedConversation.id, user.id)
                     .then(() => { handleSelectConversation(null); return resync(); })
                     .catch((requestError) => window.alert(requestError.message));
                 }
-              }}>Leave</button>
+              }}>Leave</button>}
               <button type="button" onClick={() => setShowPinnedMessages(true)}>
                 Pinned messages
               </button>

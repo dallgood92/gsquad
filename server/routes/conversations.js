@@ -215,6 +215,56 @@ module.exports = function createConversationRoutes(
     }
   });
 
+  router.post("/direct", async (req, res) => {
+    try {
+      const targetUserId = Number(req.body.userId);
+      if (!Number.isInteger(targetUserId) || targetUserId <= 0 || targetUserId === req.userId) {
+        return res.status(400).json({ error: "Invalid direct-message recipient" });
+      }
+      const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
+      if (!targetUser) return res.status(404).json({ error: "User not found" });
+
+      const directKey = [req.userId, targetUserId].sort((a, b) => a - b).join(":");
+      let conversation = await prisma.conversation.findUnique({
+        where: { directKey },
+        include: { members: { include: { user: true } } },
+      });
+      let wasCreated = false;
+
+      if (!conversation) {
+        wasCreated = true;
+        conversation = await prisma.conversation.create({
+          data: {
+            name: targetUser.name,
+            type: "DIRECT",
+            directKey,
+            members: {
+              create: [
+                { userId: req.userId, role: "ADMIN" },
+                { userId: targetUserId, role: "ADMIN" },
+              ],
+            },
+          },
+          include: { members: { include: { user: true } } },
+        });
+        await redis.publishChatEvent({
+          recipientUserIds: [targetUserId],
+          event: { type: "conversation_added", data: { conversation: { ...conversation, unreadCount: 0, lastMessage: null } } },
+        });
+      } else {
+        await prisma.conversationMember.update({
+          where: { userId_conversationId: { userId: req.userId, conversationId: conversation.id } },
+          data: { archivedAt: null },
+        });
+      }
+
+      res.status(wasCreated ? 201 : 200).json({ ...conversation, unreadCount: 0, lastMessage: null });
+    } catch (error) {
+      console.error("Failed to create direct conversation:", error);
+      res.status(500).json({ error: "Failed to create direct conversation" });
+    }
+  });
+
   router.patch(
     "/:conversationId/read",
     async (req, res) => {

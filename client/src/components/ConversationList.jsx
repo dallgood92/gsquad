@@ -1,4 +1,5 @@
 import { useState } from "react";
+import StartDirectMessage from "./StartDirectMessage";
 
 function ConversationList({
   conversations,
@@ -6,6 +7,7 @@ function ConversationList({
   onSelectConversation,
   onCreateConversation,
   currentUserId,
+  onDirectConversationCreated,
 }) {
   const [name, setName] =
     useState("");
@@ -71,6 +73,7 @@ function ConversationList({
       )}
 
       <div className="conversation-list">
+        <StartDirectMessage onCreated={onDirectConversationCreated} />
         {conversations.map(
           (conversation) => (
             <button
@@ -88,7 +91,9 @@ function ConversationList({
               }
             >
               <div>
-                {conversation.name}
+                {conversation.type === "DIRECT"
+                  ? conversation.members.find((membership) => membership.userId !== currentUserId)?.user.name ?? conversation.name
+                  : conversation.name}
 
                 {conversation.members.find((membership) => membership.userId === currentUserId)?.notificationsMuted && (
                   <span className="conversation-muted" title="Notifications muted"> · Muted</span>

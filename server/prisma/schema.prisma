@@ -25,10 +25,17 @@ model User {
 model Conversation {
   id            Int                  @id @default(autoincrement())
   name          String
+  type          ConversationType     @default(GROUP)
+  directKey     String?              @unique
   messages      Message[]
   members       ConversationMember[]
   notifications Notification[]
   createdAt     DateTime             @default(now())
+}
+
+enum ConversationType {
+  GROUP
+  DIRECT
 }
 
 model ConversationMember {

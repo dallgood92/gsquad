@@ -55,6 +55,11 @@ Conversation List
 }
 
 .conversation-muted { color: #666; font-size: 12px; }
+.start-direct-message { position: relative; }
+.direct-message-search { position: absolute; left: 0; z-index: 20; width: 300px; padding: 8px; border: 1px solid #ddd; border-radius: 8px; background: white; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16); }
+.direct-message-search input { width: 100%; padding: 8px; }
+.direct-message-search > button { display: flex; flex-direction: column; width: 100%; padding: 8px; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.direct-message-search > button:hover { background: #f3f4f6; }
 
 /* ================================
 Chat

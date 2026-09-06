@@ -150,6 +150,17 @@ export async function createConversation(
   return response.json();
 }
 
+export async function createDirectConversation(userId) {
+  const response = await fetch(`${API_URL}/conversations/direct`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId }),
+  });
+  if (!response.ok) throw new Error("Failed to start direct message");
+  return response.json();
+}
+
 export async function addConversationMember(
   conversationId,
   userId
