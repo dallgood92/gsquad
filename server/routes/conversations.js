@@ -18,6 +18,7 @@ module.exports = function createConversationRoutes(
             members: {
               some: {
                 userId: req.userId,
+                archivedAt: null,
               },
             },
           },
@@ -137,6 +138,20 @@ module.exports = function createConversationRoutes(
         error:
           "Failed to get conversations",
       });
+    }
+  });
+
+  router.get("/archived", async (req, res) => {
+    try {
+      const memberships = await prisma.conversationMember.findMany({
+        where: { userId: req.userId, archivedAt: { not: null } },
+        include: { conversation: { select: { id: true, name: true, createdAt: true } } },
+        orderBy: { archivedAt: "desc" },
+      });
+      res.json({ conversations: memberships.map((membership) => ({ ...membership.conversation, archivedAt: membership.archivedAt })) });
+    } catch (error) {
+      console.error("Failed to get archived conversations:", error);
+      res.status(500).json({ error: "Failed to get archived conversations" });
     }
   });
 

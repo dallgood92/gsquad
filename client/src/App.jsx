@@ -12,6 +12,7 @@ import MessageInput from "./components/MessageInput";
 import ThreadPanel from "./components/ThreadPanel";
 import PinnedMessages from "./components/PinnedMessages";
 import NotificationCenter from "./components/NotificationCenter";
+import ArchivedConversations from "./components/ArchivedConversations";
 import LoginPage from "./pages/LoginPage";
 
 import useAuth from "./hooks/useAuth";
@@ -25,6 +26,7 @@ import {
   removeConversationMember,
   updateConversationMemberRole,
   updateNotificationPreferences,
+  setConversationArchived,
 } from "./services/api";
 
 function App() {
@@ -77,6 +79,7 @@ function App() {
   const [showPinnedMessages, setShowPinnedMessages] = useState(false);
   const [pinsRevision, setPinsRevision] = useState(0);
   const [notificationsRevision, setNotificationsRevision] = useState(0);
+  const [archiveRevision, setArchiveRevision] = useState(0);
 
   const handleSelectConversation = (conversationId) => {
     setThreadMessage(null);
@@ -111,6 +114,18 @@ function App() {
         !currentMembership.notificationsMuted
       )
     );
+  };
+
+  const handleArchiveConversation = async () => {
+    if (!selectedConversation) return;
+    try {
+      await setConversationArchived(selectedConversation.id, true);
+      handleSelectConversation(null);
+      setArchiveRevision((revision) => revision + 1);
+      await resync();
+    } catch (requestError) {
+      window.alert(requestError.message);
+    }
   };
 
   const {
@@ -389,6 +404,13 @@ function App() {
               handleSelectConversation(notification.conversationId);
             }}
           />
+          <ArchivedConversations
+            revision={archiveRevision}
+            onRestore={async () => {
+              setArchiveRevision((revision) => revision + 1);
+              await resync();
+            }}
+          />
         </div>
         <div>
           <p>
@@ -505,6 +527,7 @@ function App() {
               <button type="button" onClick={handleToggleNotifications}>
                 {currentMembership.notificationsMuted ? "Unmute notifications" : "Mute notifications"}
               </button>
+              <button type="button" onClick={handleArchiveConversation}>Archive</button>
             </div>
 
             {error && (

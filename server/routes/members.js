@@ -227,5 +227,23 @@ module.exports = function createMemberRoutes(
     }
   });
 
+  router.patch("/:conversationId/archive", async (req, res) => {
+    try {
+      const conversationId = Number(req.params.conversationId);
+      const archived = req.body.archived;
+      if (!Number.isInteger(conversationId) || typeof archived !== "boolean") return res.status(400).json({ error: "Invalid archive preference" });
+      const existing = await prisma.conversationMember.findUnique({ where: { userId_conversationId: { userId: req.userId, conversationId } } });
+      if (!existing) return res.status(403).json({ error: "You are not a member of this conversation" });
+      const membership = await prisma.conversationMember.update({
+        where: { userId_conversationId: { userId: req.userId, conversationId } },
+        data: { archivedAt: archived ? new Date() : null },
+      });
+      res.json(membership);
+    } catch (error) {
+      console.error("Failed to update conversation archive:", error);
+      res.status(500).json({ error: "Failed to update conversation archive" });
+    }
+  });
+
   return router;
 };

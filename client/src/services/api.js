@@ -213,6 +213,20 @@ export async function updateNotificationPreferences(conversationId, notification
   return response.json();
 }
 
+export async function getArchivedConversations() {
+  const response = await fetch(`${API_URL}/conversations/archived`, { credentials: "include" });
+  if (!response.ok) throw new Error("Failed to load archived conversations");
+  return response.json();
+}
+
+export async function setConversationArchived(conversationId, archived) {
+  const response = await fetch(`${API_URL}/conversations/${conversationId}/archive`, {
+    method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ archived }),
+  });
+  if (!response.ok) throw new Error("Failed to update conversation archive");
+  return response.json();
+}
+
 export async function getMessages(
   conversationId,
   before = null
