@@ -35,6 +35,7 @@ model ConversationMember {
   userId            Int
   conversationId    Int
   lastReadMessageId Int?
+  role              MembershipRole @default(MEMBER)
 
   user         User         @relation(fields: [userId], references: [id])
   conversation Conversation @relation(fields: [conversationId], references: [id])
@@ -42,6 +43,11 @@ model ConversationMember {
   joinedAt DateTime @default(now())
 
   @@id([userId, conversationId])
+}
+
+enum MembershipRole {
+  ADMIN
+  MEMBER
 }
 
 model Message {

@@ -21,6 +21,9 @@ import useWebSocket from "./hooks/useWebSocket";
 
 import {
   getServerHealth,
+  renameConversation,
+  removeConversationMember,
+  updateConversationMemberRole,
 } from "./services/api";
 
 function App() {
@@ -86,6 +89,15 @@ function App() {
   const handleTogglePin = async (messageId) => {
     const updated = await toggleMessagePin(messageId);
     if (updated) setPinsRevision((revision) => revision + 1);
+  };
+
+  const refreshAfterMemberChange = async (action) => {
+    try {
+      await action();
+      await resync();
+    } catch (requestError) {
+      window.alert(requestError.message);
+    }
   };
 
   const {
@@ -303,6 +315,11 @@ function App() {
           membership.user.name
       ) || [];
 
+  const currentMembership = selectedConversation?.members.find(
+    (membership) => membership.userId === user.id
+  );
+  const isConversationAdmin = currentMembership?.role === "ADMIN";
+
   const showConnectionBanner =
     websocketStatus !==
       "connected" ||
@@ -402,6 +419,12 @@ function App() {
                     selectedConversation.name
                   }
                 </h2>
+                {isConversationAdmin && (
+                  <button type="button" onClick={() => {
+                    const name = window.prompt("Conversation name", selectedConversation.name)?.trim();
+                    if (name && name !== selectedConversation.name) refreshAfterMemberChange(() => renameConversation(selectedConversation.id, name));
+                  }}>Rename</button>
+                )}
 
                 <div className="member-list">
                   {selectedConversation.members.map(
@@ -427,20 +450,36 @@ function App() {
                         {
                           membership.user.name
                         }
+                        {membership.role === "ADMIN" && " · Admin"}
+                        {isConversationAdmin && membership.userId !== user.id && (
+                          <>
+                            <button type="button" onClick={() => refreshAfterMemberChange(() => updateConversationMemberRole(selectedConversation.id, membership.userId, membership.role === "ADMIN" ? "MEMBER" : "ADMIN"))}>
+                              {membership.role === "ADMIN" ? "Make member" : "Make admin"}
+                            </button>
+                            <button type="button" onClick={() => {
+                              if (window.confirm(`Remove ${membership.user.name}?`)) refreshAfterMemberChange(() => removeConversationMember(selectedConversation.id, membership.userId));
+                            }}>Remove</button>
+                          </>
+                        )}
                       </span>
                     )
                   )}
                 </div>
               </div>
 
-              <AddMember
-                conversationId={
-                  selectedConversation.id
+              {isConversationAdmin && (
+                <AddMember
+                  conversationId={selectedConversation.id}
+                  onMemberAdded={addMemberToConversation}
+                />
+              )}
+              <button type="button" onClick={() => {
+                if (window.confirm("Leave this conversation?")) {
+                  removeConversationMember(selectedConversation.id, user.id)
+                    .then(() => { handleSelectConversation(null); return resync(); })
+                    .catch((requestError) => window.alert(requestError.message));
                 }
-                onMemberAdded={
-                  addMemberToConversation
-                }
-              />
+              }}>Leave</button>
               <button type="button" onClick={() => setShowPinnedMessages(true)}>
                 Pinned messages
               </button>

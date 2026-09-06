@@ -178,6 +178,30 @@ export async function addConversationMember(
   return response.json();
 }
 
+export async function renameConversation(conversationId, name) {
+  const response = await fetch(`${API_URL}/conversations/${conversationId}`, {
+    method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }),
+  });
+  if (!response.ok) throw new Error("Failed to rename conversation");
+  return response.json();
+}
+
+export async function removeConversationMember(conversationId, userId) {
+  const response = await fetch(`${API_URL}/conversations/${conversationId}/members/${userId}`, {
+    method: "DELETE", credentials: "include",
+  });
+  if (!response.ok) throw new Error("Failed to remove conversation member");
+  return response.json();
+}
+
+export async function updateConversationMemberRole(conversationId, userId, role) {
+  const response = await fetch(`${API_URL}/conversations/${conversationId}/members/${userId}/role`, {
+    method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role }),
+  });
+  if (!response.ok) throw new Error("Failed to update member role");
+  return response.json();
+}
+
 export async function getMessages(
   conversationId,
   before = null

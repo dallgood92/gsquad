@@ -167,6 +167,7 @@ module.exports = function createConversationRoutes(
               create: {
                 userId:
                   req.userId,
+                role: "ADMIN",
               },
             },
           },
@@ -324,6 +325,25 @@ module.exports = function createConversationRoutes(
       }
     }
   );
+
+  router.patch("/:conversationId", async (req, res) => {
+    try {
+      const conversationId = Number(req.params.conversationId);
+      const name = String(req.body.name ?? "").trim();
+      if (!Number.isInteger(conversationId) || name.length < 1 || name.length > 100) {
+        return res.status(400).json({ error: "Invalid conversation name" });
+      }
+      const membership = await prisma.conversationMember.findUnique({
+        where: { userId_conversationId: { userId: req.userId, conversationId } },
+      });
+      if (membership?.role !== "ADMIN") return res.status(403).json({ error: "Only admins can rename this conversation" });
+      const conversation = await prisma.conversation.update({ where: { id: conversationId }, data: { name } });
+      res.json(conversation);
+    } catch (error) {
+      console.error("Failed to rename conversation:", error);
+      res.status(500).json({ error: "Failed to rename conversation" });
+    }
+  });
 
   return router;
 };

@@ -54,10 +54,10 @@ module.exports = function createMemberRoutes(
             },
           });
 
-        if (!requesterMembership) {
+        if (requesterMembership?.role !== "ADMIN") {
           return res.status(403).json({
             error:
-              "You are not a member of this conversation",
+              "Only admins can add members",
           });
         }
 
@@ -152,6 +152,57 @@ module.exports = function createMemberRoutes(
       }
     }
   );
+
+  router.delete("/:conversationId/members/:userId", async (req, res) => {
+    try {
+      const conversationId = Number(req.params.conversationId);
+      const userId = Number(req.params.userId);
+      if (!Number.isInteger(conversationId) || !Number.isInteger(userId)) return res.status(400).json({ error: "Invalid conversation or user ID" });
+      const requester = await prisma.conversationMember.findUnique({
+        where: { userId_conversationId: { userId: req.userId, conversationId } },
+      });
+      const target = await prisma.conversationMember.findUnique({
+        where: { userId_conversationId: { userId, conversationId } },
+      });
+      if (!requester || (req.userId !== userId && requester.role !== "ADMIN")) return res.status(403).json({ error: "You cannot remove this member" });
+      if (!target) return res.status(404).json({ error: "Membership not found" });
+      if (target.role === "ADMIN") {
+        const adminCount = await prisma.conversationMember.count({ where: { conversationId, role: "ADMIN" } });
+        if (adminCount === 1) return res.status(409).json({ error: "Assign another admin before the last admin leaves" });
+      }
+      await prisma.conversationMember.delete({ where: { userId_conversationId: { userId, conversationId } } });
+      res.json({ success: true, userId, conversationId });
+    } catch (error) {
+      console.error("Failed to remove member:", error);
+      res.status(500).json({ error: "Failed to remove member" });
+    }
+  });
+
+  router.patch("/:conversationId/members/:userId/role", async (req, res) => {
+    try {
+      const conversationId = Number(req.params.conversationId);
+      const userId = Number(req.params.userId);
+      const role = req.body.role;
+      if (!Number.isInteger(conversationId) || !Number.isInteger(userId) || !["ADMIN", "MEMBER"].includes(role)) {
+        return res.status(400).json({ error: "Invalid role request" });
+      }
+      const requester = await prisma.conversationMember.findUnique({ where: { userId_conversationId: { userId: req.userId, conversationId } } });
+      const target = await prisma.conversationMember.findUnique({ where: { userId_conversationId: { userId, conversationId } } });
+      if (requester?.role !== "ADMIN") return res.status(403).json({ error: "Only admins can change roles" });
+      if (!target) return res.status(404).json({ error: "Membership not found" });
+      if (target.role === "ADMIN" && role === "MEMBER") {
+        const adminCount = await prisma.conversationMember.count({ where: { conversationId, role: "ADMIN" } });
+        if (adminCount === 1) return res.status(409).json({ error: "A conversation must keep at least one admin" });
+      }
+      const membership = await prisma.conversationMember.update({
+        where: { userId_conversationId: { userId, conversationId } }, data: { role }, include: { user: true },
+      });
+      res.json(membership);
+    } catch (error) {
+      console.error("Failed to change member role:", error);
+      res.status(500).json({ error: "Failed to change member role" });
+    }
+  });
 
   return router;
 };
