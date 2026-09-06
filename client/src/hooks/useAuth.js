@@ -8,8 +8,8 @@ function useAuth() {
   useEffect(() => {
     async function checkAuth() {
       try {
-        const currentUser = await getCurrentUser();
-        setUser(currentUser);
+        const data = await getCurrentUser();
+        setUser(data?.user ?? null);
       } catch (error) {
         console.error("Failed to check authentication:", error);
         setUser(null);

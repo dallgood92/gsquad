@@ -7,10 +7,12 @@ import {
 
 import {
   createConversation as createConversationRequest,
+  deleteMessage as deleteMessageRequest,
   getConversations,
   getMessages,
   markConversationRead as markConversationReadRequest,
   sendMessage as sendMessageRequest,
+  updateMessage as updateMessageRequest,
 } from "../services/api";
 
 function mergeMessages(
@@ -19,12 +21,8 @@ function mergeMessages(
   const messagesById =
     new Map();
 
-  for (
-    const messages of messageGroups
-  ) {
-    for (
-      const message of messages
-    ) {
+  for (const messages of messageGroups) {
+    for (const message of messages) {
       messagesById.set(
         message.id,
         message
@@ -78,6 +76,32 @@ function sortConversations(
   );
 }
 
+function replaceMessageInConversation(
+  conversation,
+  updatedMessage
+) {
+  const messages =
+    conversation.messages.map(
+      (message) =>
+        message.id ===
+        updatedMessage.id
+          ? updatedMessage
+          : message
+    );
+
+  const lastMessage =
+    conversation.lastMessage?.id ===
+    updatedMessage.id
+      ? updatedMessage
+      : conversation.lastMessage;
+
+  return {
+    ...conversation,
+    messages,
+    lastMessage,
+  };
+}
+
 function useConversations(
   currentUserId
 ) {
@@ -109,10 +133,8 @@ function useConversations(
     setOlderMessagesLoading,
   ] = useState(false);
 
-  const [
-    syncing,
-    setSyncing,
-  ] = useState(false);
+  const [syncing, setSyncing] =
+    useState(false);
 
   const [error, setError] =
     useState(null);
@@ -774,8 +796,10 @@ function useConversations(
                         ? 0
                         : messageAlreadyExists
                           ? conversation.unreadCount
-                          : conversation.unreadCount +
-                            1,
+                          : (
+                              conversation.unreadCount ??
+                              0
+                            ) + 1,
                   };
                 }
               );
@@ -797,6 +821,136 @@ function useConversations(
       },
       [markConversationRead]
     );
+
+  const receiveMessageUpdate =
+    useCallback(
+      (updatedMessage) => {
+        setConversations(
+          (
+            currentConversations
+          ) =>
+            currentConversations.map(
+              (conversation) => {
+                if (
+                  conversation.id !==
+                  updatedMessage.conversationId
+                ) {
+                  return conversation;
+                }
+
+                return replaceMessageInConversation(
+                  conversation,
+                  updatedMessage
+                );
+              }
+            )
+        );
+      },
+      []
+    );
+
+  const receiveMessageDelete =
+    useCallback(
+      (deletedMessage) => {
+        setConversations(
+          (
+            currentConversations
+          ) =>
+            currentConversations.map(
+              (conversation) => {
+                if (
+                  conversation.id !==
+                  deletedMessage.conversationId
+                ) {
+                  return conversation;
+                }
+
+                return replaceMessageInConversation(
+                  conversation,
+                  deletedMessage
+                );
+              }
+            )
+        );
+      },
+      []
+    );
+
+  const editMessage =
+    async (
+      messageId,
+      text
+    ) => {
+      if (
+        !selectedConversationId
+      ) {
+        return false;
+      }
+
+      if (!text.trim()) {
+        return false;
+      }
+
+      try {
+        setError(null);
+
+        const updatedMessage =
+          await updateMessageRequest(
+            selectedConversationId,
+            messageId,
+            text
+          );
+
+        receiveMessageUpdate(
+          updatedMessage
+        );
+
+        return true;
+      } catch (error) {
+        console.error(
+          "Failed to edit message:",
+          error
+        );
+
+        setError(error.message);
+
+        return false;
+      }
+    };
+
+  const deleteMessage =
+    async (messageId) => {
+      if (
+        !selectedConversationId
+      ) {
+        return false;
+      }
+
+      try {
+        setError(null);
+
+        const deletedMessage =
+          await deleteMessageRequest(
+            selectedConversationId,
+            messageId
+          );
+
+        receiveMessageDelete(
+          deletedMessage
+        );
+
+        return true;
+      } catch (error) {
+        console.error(
+          "Failed to delete message:",
+          error
+        );
+
+        setError(error.message);
+
+        return false;
+      }
+    };
 
   const loadOlderMessages =
     async () => {
@@ -967,7 +1121,9 @@ function useConversations(
         return;
       }
 
-      if (!selectedConversationId) {
+      if (
+        !selectedConversationId
+      ) {
         return;
       }
 
@@ -1007,6 +1163,11 @@ function useConversations(
 
     receiveConversation,
     receiveMessage,
+    receiveMessageUpdate,
+    receiveMessageDelete,
+
+    editMessage,
+    deleteMessage,
 
     loadOlderMessages,
 

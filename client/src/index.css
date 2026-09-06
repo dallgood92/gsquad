@@ -136,11 +136,24 @@ Message List
 
 .message-text {
   font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.message-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .message-time {
   font-size: 12px;
   opacity: 0.6;
+}
+
+.message-edited {
+  font-size: 12px;
+  opacity: 0.6;
+  font-style: italic;
 }
 
 .message-own {
@@ -152,11 +165,86 @@ Message List
   align-self: flex-start;
 }
 
+.message-deleted {
+  opacity: 0.75;
+}
+
+.message-deleted-text {
+  font-style: italic;
+}
+
 .older-messages-loading {
   align-self: center;
   margin: 0;
   font-size: 14px;
 }
+
+/* ================================
+Message Actions
+================================ */
+
+.message-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.message-actions button {
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.message-actions button:hover {
+  background: #f5f5f5;
+}
+
+.message-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ================================
+Message Editing
+================================ */
+
+.message-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.message-edit-form input {
+  width: 100%;
+  min-width: 250px;
+  padding: 8px;
+  font-size: 16px;
+}
+
+.message-edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.message-edit-actions button {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+}
+
+.message-edit-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ================================
+New Messages
+================================ */
 
 .new-messages-button {
   position: absolute;
@@ -171,7 +259,8 @@ Message List
   background: white;
   cursor: pointer;
 
-  box-shadow: 0 2px 8px
+  box-shadow:
+    0 2px 8px
     rgba(0, 0, 0, 0.15);
 }
 

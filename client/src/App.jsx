@@ -42,6 +42,10 @@ function App() {
     addMemberToConversation,
     receiveConversation,
     receiveMessage,
+    receiveMessageUpdate,
+    receiveMessageDelete,
+    editMessage,
+    deleteMessage,
     loadOlderMessages,
     startTyping,
     stopTyping,
@@ -77,6 +81,18 @@ function App() {
 
           case "message_created":
             receiveMessage(
+              event.data.message
+            );
+            break;
+
+          case "message_updated":
+            receiveMessageUpdate(
+              event.data.message
+            );
+            break;
+
+          case "message_deleted":
+            receiveMessageDelete(
               event.data.message
             );
             break;
@@ -126,6 +142,8 @@ function App() {
       [
         receiveConversation,
         receiveMessage,
+        receiveMessageUpdate,
+        receiveMessageDelete,
         setInitialPresence,
         setUserOffline,
         setUserOnline,
@@ -409,6 +427,12 @@ function App() {
                 }
                 olderMessagesLoading={
                   olderMessagesLoading
+                }
+                onEditMessage={
+                  editMessage
+                }
+                onDeleteMessage={
+                  deleteMessage
                 }
               />
             )}

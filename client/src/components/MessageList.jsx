@@ -6,9 +6,7 @@ import {
 } from "react";
 
 const LOAD_MORE_THRESHOLD = 100;
-
-const NEAR_BOTTOM_THRESHOLD =
-  100;
+const NEAR_BOTTOM_THRESHOLD = 100;
 
 function formatMessageTime(
   createdAt
@@ -35,6 +33,8 @@ function MessageList({
   hasMoreMessages,
   onLoadOlderMessages,
   olderMessagesLoading,
+  onEditMessage,
+  onDeleteMessage,
 }) {
   const listRef =
     useRef(null);
@@ -55,6 +55,26 @@ function MessageList({
     hasNewMessages,
     setHasNewMessages,
   ] = useState(false);
+
+  const [
+    editingMessageId,
+    setEditingMessageId,
+  ] = useState(null);
+
+  const [
+    editingText,
+    setEditingText,
+  ] = useState("");
+
+  const [
+    savingMessageId,
+    setSavingMessageId,
+  ] = useState(null);
+
+  const [
+    deletingMessageId,
+    setDeletingMessageId,
+  ] = useState(null);
 
   const isNearBottom = () => {
     const list =
@@ -164,6 +184,89 @@ function MessageList({
     }
   };
 
+  const startEditing = (
+    message
+  ) => {
+    setEditingMessageId(
+      message.id
+    );
+
+    setEditingText(
+      message.text
+    );
+  };
+
+  const cancelEditing = () => {
+    setEditingMessageId(
+      null
+    );
+
+    setEditingText("");
+  };
+
+  const saveEditing =
+    async (messageId) => {
+      const trimmedText =
+        editingText.trim();
+
+      if (!trimmedText) {
+        return;
+      }
+
+      try {
+        setSavingMessageId(
+          messageId
+        );
+
+        const saved =
+          await onEditMessage(
+            messageId,
+            trimmedText
+          );
+
+        if (saved) {
+          cancelEditing();
+        }
+      } finally {
+        setSavingMessageId(
+          null
+        );
+      }
+    };
+
+  const handleDelete =
+    async (messageId) => {
+      const shouldDelete =
+        window.confirm(
+          "Delete this message?"
+        );
+
+      if (!shouldDelete) {
+        return;
+      }
+
+      try {
+        setDeletingMessageId(
+          messageId
+        );
+
+        await onDeleteMessage(
+          messageId
+        );
+
+        if (
+          editingMessageId ===
+          messageId
+        ) {
+          cancelEditing();
+        }
+      } finally {
+        setDeletingMessageId(
+          null
+        );
+      }
+    };
+
   useLayoutEffect(() => {
     const list =
       listRef.current;
@@ -214,7 +317,9 @@ function MessageList({
       currentLastMessage.id !==
         previousLastMessage?.id;
 
-    if (!newMessageWasAppended) {
+    if (
+      !newMessageWasAppended
+    ) {
       return;
     }
 
@@ -241,6 +346,29 @@ function MessageList({
       messages;
   }, [messages]);
 
+  useEffect(() => {
+    if (!editingMessageId) {
+      return;
+    }
+
+    const editingMessage =
+      messages.find(
+        (message) =>
+          message.id ===
+          editingMessageId
+      );
+
+    if (
+      !editingMessage ||
+      editingMessage.deletedAt
+    ) {
+      cancelEditing();
+    }
+  }, [
+    messages,
+    editingMessageId,
+  ]);
+
   return (
     <div className="message-list-container">
       <div
@@ -260,6 +388,23 @@ function MessageList({
               message.senderId ===
               currentUser.id;
 
+            const isDeleted =
+              Boolean(
+                message.deletedAt
+              );
+
+            const isEditing =
+              editingMessageId ===
+              message.id;
+
+            const isSaving =
+              savingMessageId ===
+              message.id;
+
+            const isDeleting =
+              deletingMessageId ===
+              message.id;
+
             return (
               <div
                 key={message.id}
@@ -267,6 +412,10 @@ function MessageList({
                   isOwnMessage
                     ? "message-own"
                     : "message-other"
+                } ${
+                  isDeleted
+                    ? "message-deleted"
+                    : ""
                 }`}
               >
                 <span className="message-sender">
@@ -276,15 +425,134 @@ function MessageList({
                   }
                 </span>
 
-                <span className="message-text">
-                  {message.text}
-                </span>
+                {isDeleted ? (
+                  <span className="message-text message-deleted-text">
+                    Message deleted
+                  </span>
+                ) : isEditing ? (
+                  <div className="message-edit-form">
+                    <input
+                      type="text"
+                      value={
+                        editingText
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        setEditingText(
+                          event.target
+                            .value
+                        )
+                      }
+                      onKeyDown={(
+                        event
+                      ) => {
+                        if (
+                          event.key ===
+                          "Enter"
+                        ) {
+                          event.preventDefault();
 
-                <span className="message-time">
-                  {formatMessageTime(
-                    message.createdAt
+                          saveEditing(
+                            message.id
+                          );
+                        }
+
+                        if (
+                          event.key ===
+                          "Escape"
+                        ) {
+                          cancelEditing();
+                        }
+                      }}
+                      maxLength={2000}
+                      autoFocus
+                    />
+
+                    <div className="message-edit-actions">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          saveEditing(
+                            message.id
+                          )
+                        }
+                        disabled={
+                          isSaving ||
+                          !editingText.trim()
+                        }
+                      >
+                        {isSaving
+                          ? "Saving..."
+                          : "Save"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={
+                          cancelEditing
+                        }
+                        disabled={
+                          isSaving
+                        }
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="message-text">
+                    {message.text}
+                  </span>
+                )}
+
+                <div className="message-meta">
+                  <span className="message-time">
+                    {formatMessageTime(
+                      message.createdAt
+                    )}
+                  </span>
+
+                  {!isDeleted &&
+                    message.editedAt && (
+                      <span className="message-edited">
+                        (edited)
+                      </span>
+                    )}
+                </div>
+
+                {isOwnMessage &&
+                  !isDeleted &&
+                  !isEditing && (
+                    <div className="message-actions">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          startEditing(
+                            message
+                          )
+                        }
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleDelete(
+                            message.id
+                          )
+                        }
+                        disabled={
+                          isDeleting
+                        }
+                      >
+                        {isDeleting
+                          ? "Deleting..."
+                          : "Delete"}
+                      </button>
+                    </div>
                   )}
-                </span>
               </div>
             );
           }

@@ -243,6 +243,56 @@ export async function sendMessage(
   return response.json();
 }
 
+export async function updateMessage(
+  conversationId,
+  messageId,
+  text
+) {
+  const response = await fetch(
+    `${API_URL}/conversations/${conversationId}/messages/${messageId}`,
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+      body: JSON.stringify({
+        text,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "Failed to update message"
+    );
+  }
+
+  return response.json();
+}
+
+export async function deleteMessage(
+  conversationId,
+  messageId
+) {
+  const response = await fetch(
+    `${API_URL}/conversations/${conversationId}/messages/${messageId}`,
+    {
+      method: "DELETE",
+      credentials: "include",
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "Failed to delete message"
+    );
+  }
+
+  return response.json();
+}
+
 export async function markConversationRead(
   conversationId,
   messageId

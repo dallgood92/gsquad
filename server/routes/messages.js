@@ -2,219 +2,570 @@ const express = require("express");
 
 const {
   createMessageSchema,
-} = require("../validation/messageSchemas");
+  updateMessageSchema,
+} = require(
+  "../validation/messageSchemas"
+);
 
 const router = express.Router();
 
 const MESSAGE_PAGE_SIZE = 30;
 
-module.exports = function createMessageRoutes(
+async function getRecipientUserIds(
   prisma,
-  redis
+  conversationId,
+  senderUserId
 ) {
-  router.get(
-    "/:conversationId/messages",
-    async (req, res) => {
-      try {
-        const conversationId = Number(
-          req.params.conversationId
-        );
+  const members =
+    await prisma.conversationMember.findMany({
+      where: {
+        conversationId,
+      },
 
-        if (!Number.isInteger(conversationId)) {
-          return res.status(400).json({
-            error: "Invalid conversation ID",
-          });
-        }
+      select: {
+        userId: true,
+      },
+    });
 
-        const before = req.query.before
-          ? Number(req.query.before)
-          : null;
+  return members
+    .map(
+      (member) =>
+        member.userId
+    )
+    .filter(
+      (userId) =>
+        userId !== senderUserId
+    );
+}
 
-        if (
-          before !== null &&
-          !Number.isInteger(before)
-        ) {
-          return res.status(400).json({
-            error: "Invalid message cursor",
-          });
-        }
+module.exports =
+  function createMessageRoutes(
+    prisma,
+    redis
+  ) {
+    router.get(
+      "/:conversationId/messages",
+      async (req, res) => {
+        try {
+          const conversationId =
+            Number(
+              req.params
+                .conversationId
+            );
 
-        const membership =
-          await prisma.conversationMember.findUnique({
-            where: {
-              userId_conversationId: {
-                userId: req.userId,
-                conversationId,
-              },
-            },
-          });
+          if (
+            !Number.isInteger(
+              conversationId
+            ) ||
+            conversationId <= 0
+          ) {
+            return res
+              .status(400)
+              .json({
+                error:
+                  "Invalid conversation ID",
+              });
+          }
 
-        if (!membership) {
-          return res.status(403).json({
-            error:
-              "You are not a member of this conversation",
-          });
-        }
+          const before =
+            req.query.before
+              ? Number(
+                  req.query.before
+                )
+              : null;
 
-        const messages =
-          await prisma.message.findMany({
-            where: {
-              conversationId,
+          if (
+            before !== null &&
+            (
+              !Number.isInteger(
+                before
+              ) ||
+              before <= 0
+            )
+          ) {
+            return res
+              .status(400)
+              .json({
+                error:
+                  "Invalid message cursor",
+              });
+          }
 
-              ...(before && {
-                id: {
-                  lt: before,
+          const membership =
+            await prisma.conversationMember.findUnique({
+              where: {
+                userId_conversationId: {
+                  userId:
+                    req.userId,
+
+                  conversationId,
                 },
-              }),
-            },
+              },
+            });
 
-            include: {
-              sender: true,
-            },
+          if (!membership) {
+            return res
+              .status(403)
+              .json({
+                error:
+                  "You are not a member of this conversation",
+              });
+          }
 
-            orderBy: {
-              id: "desc",
-            },
+          const messages =
+            await prisma.message.findMany({
+              where: {
+                conversationId,
 
-            take: MESSAGE_PAGE_SIZE + 1,
+                ...(before && {
+                  id: {
+                    lt: before,
+                  },
+                }),
+              },
+
+              include: {
+                sender: true,
+              },
+
+              orderBy: {
+                id: "desc",
+              },
+
+              take:
+                MESSAGE_PAGE_SIZE +
+                1,
+            });
+
+          const hasMore =
+            messages.length >
+            MESSAGE_PAGE_SIZE;
+
+          if (hasMore) {
+            messages.pop();
+          }
+
+          messages.reverse();
+
+          const nextCursor =
+            hasMore &&
+            messages.length > 0
+              ? messages[0].id
+              : null;
+
+          res.json({
+            messages,
+            hasMore,
+            nextCursor,
           });
-
-        const hasMore =
-          messages.length > MESSAGE_PAGE_SIZE;
-
-        if (hasMore) {
-          messages.pop();
-        }
-
-        messages.reverse();
-
-        const nextCursor =
-          hasMore && messages.length > 0
-            ? messages[0].id
-            : null;
-
-        res.json({
-          messages,
-          hasMore,
-          nextCursor,
-        });
-      } catch (error) {
-        console.error(
-          "Failed to get messages:",
-          error
-        );
-
-        res.status(500).json({
-          error: "Failed to get messages",
-        });
-      }
-    }
-  );
-
-  router.post(
-    "/:conversationId/messages",
-    async (req, res) => {
-      try {
-        const conversationId = Number(
-          req.params.conversationId
-        );
-
-        if (!Number.isInteger(conversationId)) {
-          return res.status(400).json({
-            error: "Invalid conversation ID",
-          });
-        }
-
-        const result =
-          createMessageSchema.safeParse(
-            req.body
+        } catch (error) {
+          console.error(
+            "Failed to get messages:",
+            error
           );
 
-        if (!result.success) {
-          return res.status(400).json({
-            error: "Invalid message",
-            details: result.error.issues,
+          res.status(500).json({
+            error:
+              "Failed to get messages",
           });
         }
+      }
+    );
 
-        const { text } = result.data;
+    router.post(
+      "/:conversationId/messages",
+      async (req, res) => {
+        try {
+          const conversationId =
+            Number(
+              req.params
+                .conversationId
+            );
 
-        const membership =
-          await prisma.conversationMember.findUnique({
-            where: {
-              userId_conversationId: {
-                userId: req.userId,
+          if (
+            !Number.isInteger(
+              conversationId
+            ) ||
+            conversationId <= 0
+          ) {
+            return res
+              .status(400)
+              .json({
+                error:
+                  "Invalid conversation ID",
+              });
+          }
+
+          const result =
+            createMessageSchema.safeParse(
+              req.body
+            );
+
+          if (!result.success) {
+            return res
+              .status(400)
+              .json({
+                error:
+                  "Invalid message",
+
+                details:
+                  result.error.issues,
+              });
+          }
+
+          const { text } =
+            result.data;
+
+          const membership =
+            await prisma.conversationMember.findUnique({
+              where: {
+                userId_conversationId: {
+                  userId:
+                    req.userId,
+
+                  conversationId,
+                },
+              },
+            });
+
+          if (!membership) {
+            return res
+              .status(403)
+              .json({
+                error:
+                  "You are not a member of this conversation",
+              });
+          }
+
+          const newMessage =
+            await prisma.message.create({
+              data: {
+                text,
+                senderId:
+                  req.userId,
                 conversationId,
+              },
+
+              include: {
+                sender: true,
+              },
+            });
+
+          const recipientUserIds =
+            await getRecipientUserIds(
+              prisma,
+              conversationId,
+              req.userId
+            );
+
+          await redis.publishChatEvent({
+            recipientUserIds,
+
+            event: {
+              type:
+                "message_created",
+
+              data: {
+                message:
+                  newMessage,
               },
             },
           });
 
-        if (!membership) {
-          return res.status(403).json({
-            error:
-              "You are not a member of this conversation",
-          });
-        }
-
-        const newMessage =
-          await prisma.message.create({
-            data: {
-              text,
-              senderId: req.userId,
-              conversationId,
-            },
-
-            include: {
-              sender: true,
-            },
-          });
-
-        const members =
-          await prisma.conversationMember.findMany({
-            where: {
-              conversationId,
-            },
-
-            select: {
-              userId: true,
-            },
-          });
-
-        const recipientUserIds = members
-          .map((member) => member.userId)
-          .filter(
-            (userId) =>
-              userId !== req.userId
+          res
+            .status(201)
+            .json(newMessage);
+        } catch (error) {
+          console.error(
+            "Failed to create message:",
+            error
           );
 
-        await redis.publishChatEvent({
-          recipientUserIds,
-
-          event: {
-            type: "message_created",
-
-            data: {
-              message: newMessage,
-            },
-          },
-        });
-
-        res
-          .status(201)
-          .json(newMessage);
-      } catch (error) {
-        console.error(
-          "Failed to create message:",
-          error
-        );
-
-        res.status(500).json({
-          error:
-            "Failed to create message",
-        });
+          res.status(500).json({
+            error:
+              "Failed to create message",
+          });
+        }
       }
-    }
-  );
+    );
 
-  return router;
-};
+    router.patch(
+      "/:conversationId/messages/:messageId",
+      async (req, res) => {
+        try {
+          const conversationId =
+            Number(
+              req.params
+                .conversationId
+            );
+
+          const messageId =
+            Number(
+              req.params.messageId
+            );
+
+          if (
+            !Number.isInteger(
+              conversationId
+            ) ||
+            conversationId <= 0 ||
+            !Number.isInteger(
+              messageId
+            ) ||
+            messageId <= 0
+          ) {
+            return res
+              .status(400)
+              .json({
+                error:
+                  "Invalid conversation or message ID",
+              });
+          }
+
+          const result =
+            updateMessageSchema.safeParse(
+              req.body
+            );
+
+          if (!result.success) {
+            return res
+              .status(400)
+              .json({
+                error:
+                  "Invalid message",
+
+                details:
+                  result.error.issues,
+              });
+          }
+
+          const message =
+            await prisma.message.findFirst({
+              where: {
+                id: messageId,
+                conversationId,
+              },
+            });
+
+          if (!message) {
+            return res
+              .status(404)
+              .json({
+                error:
+                  "Message not found",
+              });
+          }
+
+          if (
+            message.senderId !==
+            req.userId
+          ) {
+            return res
+              .status(403)
+              .json({
+                error:
+                  "You can only edit your own messages",
+              });
+          }
+
+          if (message.deletedAt) {
+            return res
+              .status(409)
+              .json({
+                error:
+                  "Deleted messages cannot be edited",
+              });
+          }
+
+          const updatedMessage =
+            await prisma.message.update({
+              where: {
+                id: messageId,
+              },
+
+              data: {
+                text:
+                  result.data.text,
+
+                editedAt:
+                  new Date(),
+              },
+
+              include: {
+                sender: true,
+              },
+            });
+
+          const recipientUserIds =
+            await getRecipientUserIds(
+              prisma,
+              conversationId,
+              req.userId
+            );
+
+          await redis.publishChatEvent({
+            recipientUserIds,
+
+            event: {
+              type:
+                "message_updated",
+
+              data: {
+                message:
+                  updatedMessage,
+              },
+            },
+          });
+
+          res.json(
+            updatedMessage
+          );
+        } catch (error) {
+          console.error(
+            "Failed to update message:",
+            error
+          );
+
+          res.status(500).json({
+            error:
+              "Failed to update message",
+          });
+        }
+      }
+    );
+
+    router.delete(
+      "/:conversationId/messages/:messageId",
+      async (req, res) => {
+        try {
+          const conversationId =
+            Number(
+              req.params
+                .conversationId
+            );
+
+          const messageId =
+            Number(
+              req.params.messageId
+            );
+
+          if (
+            !Number.isInteger(
+              conversationId
+            ) ||
+            conversationId <= 0 ||
+            !Number.isInteger(
+              messageId
+            ) ||
+            messageId <= 0
+          ) {
+            return res
+              .status(400)
+              .json({
+                error:
+                  "Invalid conversation or message ID",
+              });
+          }
+
+          const message =
+            await prisma.message.findFirst({
+              where: {
+                id: messageId,
+                conversationId,
+              },
+            });
+
+          if (!message) {
+            return res
+              .status(404)
+              .json({
+                error:
+                  "Message not found",
+              });
+          }
+
+          if (
+            message.senderId !==
+            req.userId
+          ) {
+            return res
+              .status(403)
+              .json({
+                error:
+                  "You can only delete your own messages",
+              });
+          }
+
+          if (message.deletedAt) {
+            const existingMessage =
+              await prisma.message.findUnique({
+                where: {
+                  id: messageId,
+                },
+
+                include: {
+                  sender: true,
+                },
+              });
+
+            return res.json(
+              existingMessage
+            );
+          }
+
+          const deletedMessage =
+            await prisma.message.update({
+              where: {
+                id: messageId,
+              },
+
+              data: {
+                deletedAt:
+                  new Date(),
+              },
+
+              include: {
+                sender: true,
+              },
+            });
+
+          const recipientUserIds =
+            await getRecipientUserIds(
+              prisma,
+              conversationId,
+              req.userId
+            );
+
+          await redis.publishChatEvent({
+            recipientUserIds,
+
+            event: {
+              type:
+                "message_deleted",
+
+              data: {
+                message:
+                  deletedMessage,
+              },
+            },
+          });
+
+          res.json(
+            deletedMessage
+          );
+        } catch (error) {
+          console.error(
+            "Failed to delete message:",
+            error
+          );
+
+          res.status(500).json({
+            error:
+              "Failed to delete message",
+          });
+        }
+      }
+    );
+
+    return router;
+  };
