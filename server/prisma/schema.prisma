@@ -8,24 +8,27 @@ datasource db {
 }
 
 model User {
-  id          Int                  @id @default(autoincrement())
-  googleId    String               @unique
-  email       String               @unique
-  name        String
-  avatarUrl   String?
-  messages    Message[]
-  reactions   MessageReaction[]
-  messagePins MessagePin[]
-  memberships ConversationMember[]
-  createdAt   DateTime             @default(now())
+  id                   Int                  @id @default(autoincrement())
+  googleId             String               @unique
+  email                String               @unique
+  name                 String
+  avatarUrl            String?
+  messages             Message[]
+  reactions            MessageReaction[]
+  messagePins          MessagePin[]
+  notifications        Notification[]       @relation("NotificationRecipient")
+  notificationsCreated Notification[]       @relation("NotificationActor")
+  memberships          ConversationMember[]
+  createdAt            DateTime             @default(now())
 }
 
 model Conversation {
-  id        Int                  @id @default(autoincrement())
-  name      String
-  messages  Message[]
-  members   ConversationMember[]
-  createdAt DateTime             @default(now())
+  id            Int                  @id @default(autoincrement())
+  name          String
+  messages      Message[]
+  members       ConversationMember[]
+  notifications Notification[]
+  createdAt     DateTime             @default(now())
 }
 
 model ConversationMember {
@@ -56,6 +59,7 @@ model Message {
   replies          Message[]         @relation("MessageReplies")
   reactions        MessageReaction[]
   pins             MessagePin[]
+  notifications    Notification[]
 
   createdAt DateTime  @default(now())
   editedAt  DateTime?
@@ -87,4 +91,21 @@ model MessagePin {
   createdAt  DateTime @default(now())
 
   @@index([pinnedById])
+}
+
+model Notification {
+  id             Int          @id @default(autoincrement())
+  userId         Int
+  actorId        Int
+  conversationId Int
+  messageId      Int
+  user           User         @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  actor          User         @relation("NotificationActor", fields: [actorId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message        Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@unique([userId, messageId])
+  @@index([userId, readAt, id])
 }

@@ -24,6 +24,8 @@ const createUserRoutes =
   require("./routes/users");
 const createSearchRoutes =
   require("./routes/search");
+const createNotificationRoutes =
+  require("./routes/notifications");
 
 const requireAuth =
   require("./middleware/auth");
@@ -70,6 +72,12 @@ app.use(
   "/search",
   requireAuth,
   createSearchRoutes(prisma)
+);
+
+app.use(
+  "/notifications",
+  requireAuth,
+  createNotificationRoutes(prisma)
 );
 
 app.use(

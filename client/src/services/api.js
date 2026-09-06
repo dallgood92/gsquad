@@ -348,6 +348,18 @@ export async function toggleMessagePin(conversationId, messageId) {
   return response.json();
 }
 
+export async function getNotifications() {
+  const response = await fetch(`${API_URL}/notifications`, { credentials: "include" });
+  if (!response.ok) throw new Error("Failed to load notifications");
+  return response.json();
+}
+
+export async function markNotificationsRead() {
+  const response = await fetch(`${API_URL}/notifications/read`, { method: "PATCH", credentials: "include" });
+  if (!response.ok) throw new Error("Failed to mark notifications read");
+  return response.json();
+}
+
 export async function markConversationRead(
   conversationId,
   messageId

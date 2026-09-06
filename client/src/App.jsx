@@ -11,6 +11,7 @@ import MessageSearch from "./components/MessageSearch";
 import MessageInput from "./components/MessageInput";
 import ThreadPanel from "./components/ThreadPanel";
 import PinnedMessages from "./components/PinnedMessages";
+import NotificationCenter from "./components/NotificationCenter";
 import LoginPage from "./pages/LoginPage";
 
 import useAuth from "./hooks/useAuth";
@@ -69,6 +70,7 @@ function App() {
   const [threadMessage, setThreadMessage] = useState(null);
   const [showPinnedMessages, setShowPinnedMessages] = useState(false);
   const [pinsRevision, setPinsRevision] = useState(0);
+  const [notificationsRevision, setNotificationsRevision] = useState(0);
 
   const handleSelectConversation = (conversationId) => {
     setThreadMessage(null);
@@ -120,6 +122,10 @@ function App() {
             receiveMessageDelete(
               event.data.message
             );
+            break;
+
+          case "mention_notification":
+            setNotificationsRevision((revision) => revision + 1);
             break;
 
           case "conversation_added":
@@ -339,7 +345,15 @@ function App() {
       />
 
       <main className="chat">
-        <MessageSearch onSelectResult={handleSearchResult} />
+        <div className="chat-tools">
+          <MessageSearch onSelectResult={handleSearchResult} />
+          <NotificationCenter
+            revision={notificationsRevision}
+            onSelect={(notification) => {
+              handleSelectConversation(notification.conversationId);
+            }}
+          />
+        </div>
         <div>
           <p>
             Server:{" "}

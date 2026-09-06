@@ -279,6 +279,26 @@ module.exports =
               include: messageInclude,
             });
 
+          const mentionableMembers = await prisma.conversationMember.findMany({
+            where: { conversationId, userId: { not: req.userId } },
+            include: { user: { select: { id: true, name: true } } },
+          });
+          const normalizedText = text.toLocaleLowerCase();
+          const mentionedUserIds = mentionableMembers
+            .filter(({ user }) => normalizedText.includes(`@${user.name.toLocaleLowerCase()}`))
+            .map(({ userId }) => userId);
+
+          if (mentionedUserIds.length) {
+            await prisma.notification.createMany({
+              data: mentionedUserIds.map((userId) => ({ userId, actorId: req.userId, conversationId, messageId: newMessage.id })),
+              skipDuplicates: true,
+            });
+            await redis.publishChatEvent({
+              recipientUserIds: mentionedUserIds,
+              event: { type: "mention_notification", data: { conversationId, messageId: newMessage.id } },
+            });
+          }
+
           const recipientUserIds =
             await getRecipientUserIds(
               prisma,
