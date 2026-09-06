@@ -18,15 +18,22 @@ module.exports = function createMemberRoutes(
           req.params.conversationId
         );
 
-        if (!Number.isInteger(conversationId)) {
+        if (
+          !Number.isInteger(
+            conversationId
+          ) ||
+          conversationId <= 0
+        ) {
           return res.status(400).json({
-            error: "Invalid conversation ID",
+            error:
+              "Invalid conversation ID",
           });
         }
 
-        const result = addMemberSchema.safeParse(
-          req.body
-        );
+        const result =
+          addMemberSchema.safeParse(
+            req.body
+          );
 
         if (!result.success) {
           return res.status(400).json({
@@ -54,11 +61,12 @@ module.exports = function createMemberRoutes(
           });
         }
 
-        const user = await prisma.user.findUnique({
-          where: {
-            id: userId,
-          },
-        });
+        const user =
+          await prisma.user.findUnique({
+            where: {
+              id: userId,
+            },
+          });
 
         if (!user) {
           return res.status(404).json({
@@ -78,7 +86,8 @@ module.exports = function createMemberRoutes(
 
         if (existingMembership) {
           return res.status(409).json({
-            error: "User is already a member",
+            error:
+              "User is already a member",
           });
         }
 
@@ -88,6 +97,7 @@ module.exports = function createMemberRoutes(
               userId,
               conversationId,
             },
+
             include: {
               user: true,
             },
@@ -98,35 +108,37 @@ module.exports = function createMemberRoutes(
             where: {
               id: conversationId,
             },
+
             include: {
               members: {
                 include: {
                   user: true,
                 },
               },
-              messages: {
-                include: {
-                  sender: true,
-                },
-                orderBy: {
-                  createdAt: "asc",
-                },
-              },
             },
           });
 
         await redis.publishChatEvent({
-          recipientUserIds: [userId],
+          recipientUserIds: [
+            userId,
+          ],
 
           event: {
-            type: "conversation_added",
+            type:
+              "conversation_added",
+
             data: {
-              conversation,
+              conversation: {
+                ...conversation,
+                unreadCount: 0,
+              },
             },
           },
         });
 
-        res.status(201).json(membership);
+        res
+          .status(201)
+          .json(membership);
       } catch (error) {
         console.error(
           "Failed to add conversation member:",
