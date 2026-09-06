@@ -27,8 +27,9 @@ model Conversation {
 }
 
 model ConversationMember {
-  userId         Int
-  conversationId Int
+  userId            Int
+  conversationId    Int
+  lastReadMessageId Int?
 
   user         User         @relation(fields: [userId], references: [id])
   conversation Conversation @relation(fields: [conversationId], references: [id])
