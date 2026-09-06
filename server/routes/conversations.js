@@ -34,7 +34,50 @@ module.exports = function createConversationRoutes(
           },
         });
 
-      res.json(conversations);
+      const conversationsWithUnreadCounts =
+        await Promise.all(
+          conversations.map(
+            async (conversation) => {
+              const currentMembership =
+                conversation.members.find(
+                  (membership) =>
+                    membership.userId ===
+                    req.userId
+                );
+
+              const lastReadMessageId =
+                currentMembership
+                  ?.lastReadMessageId;
+
+              const unreadCount =
+                await prisma.message.count({
+                  where: {
+                    conversationId:
+                      conversation.id,
+
+                    senderId: {
+                      not: req.userId,
+                    },
+
+                    ...(lastReadMessageId && {
+                      id: {
+                        gt: lastReadMessageId,
+                      },
+                    }),
+                  },
+                });
+
+              return {
+                ...conversation,
+                unreadCount,
+              };
+            }
+          )
+        );
+
+      res.json(
+        conversationsWithUnreadCounts
+      );
     } catch (error) {
       console.error(
         "Failed to get conversations:",
@@ -57,12 +100,15 @@ module.exports = function createConversationRoutes(
 
       if (!result.success) {
         return res.status(400).json({
-          error: "Invalid conversation",
-          details: result.error.issues,
+          error:
+            "Invalid conversation",
+          details:
+            result.error.issues,
         });
       }
 
-      const { name } = result.data;
+      const { name } =
+        result.data;
 
       const conversation =
         await prisma.conversation.create({
@@ -71,7 +117,8 @@ module.exports = function createConversationRoutes(
 
             members: {
               create: {
-                userId: req.userId,
+                userId:
+                  req.userId,
               },
             },
           },
@@ -85,9 +132,10 @@ module.exports = function createConversationRoutes(
           },
         });
 
-      res
-        .status(201)
-        .json(conversation);
+      res.status(201).json({
+        ...conversation,
+        unreadCount: 0,
+      });
     } catch (error) {
       console.error(
         "Failed to create conversation:",
@@ -105,46 +153,66 @@ module.exports = function createConversationRoutes(
     "/:conversationId/read",
     async (req, res) => {
       try {
-        const conversationId = Number(
-          req.params.conversationId
-        );
+        const conversationId =
+          Number(
+            req.params
+              .conversationId
+          );
 
-        const messageId = Number(
-          req.body.messageId
-        );
+        const messageId =
+          Number(
+            req.body.messageId
+          );
 
         if (
           !Number.isInteger(
             conversationId
-          )
+          ) ||
+          conversationId <= 0
         ) {
-          return res.status(400).json({
-            error:
-              "Invalid conversation ID",
-          });
+          return res
+            .status(400)
+            .json({
+              error:
+                "Invalid conversation ID",
+            });
         }
 
-        if (!Number.isInteger(messageId)) {
-          return res.status(400).json({
-            error: "Invalid message ID",
-          });
+        if (
+          !Number.isInteger(
+            messageId
+          ) ||
+          messageId <= 0
+        ) {
+          return res
+            .status(400)
+            .json({
+              error:
+                "Invalid message ID",
+            });
         }
 
         const membership =
-          await prisma.conversationMember.findUnique({
-            where: {
-              userId_conversationId: {
-                userId: req.userId,
-                conversationId,
+          await prisma.conversationMember.findUnique(
+            {
+              where: {
+                userId_conversationId:
+                  {
+                    userId:
+                      req.userId,
+                    conversationId,
+                  },
               },
-            },
-          });
+            }
+          );
 
         if (!membership) {
-          return res.status(403).json({
-            error:
-              "You are not a member of this conversation",
-          });
+          return res
+            .status(403)
+            .json({
+              error:
+                "You are not a member of this conversation",
+            });
         }
 
         const message =
@@ -153,40 +221,67 @@ module.exports = function createConversationRoutes(
               id: messageId,
               conversationId,
             },
+
+            select: {
+              id: true,
+            },
           });
 
         if (!message) {
-          return res.status(404).json({
-            error:
-              "Message not found in this conversation",
-          });
+          return res
+            .status(404)
+            .json({
+              error:
+                "Message not found in this conversation",
+            });
         }
 
-        if (
-          membership.lastReadMessageId !==
-            null &&
-          messageId <=
-            membership.lastReadMessageId
-        ) {
-          return res.json(membership);
-        }
-
-        const updatedMembership =
-          await prisma.conversationMember.update({
+        await prisma.conversationMember.updateMany(
+          {
             where: {
-              userId_conversationId: {
-                userId: req.userId,
-                conversationId,
-              },
+              userId:
+                req.userId,
+
+              conversationId,
+
+              OR: [
+                {
+                  lastReadMessageId:
+                    null,
+                },
+                {
+                  lastReadMessageId:
+                    {
+                      lt: messageId,
+                    },
+                },
+              ],
             },
 
             data: {
               lastReadMessageId:
                 messageId,
             },
-          });
+          }
+        );
 
-        res.json(updatedMembership);
+        const updatedMembership =
+          await prisma.conversationMember.findUnique(
+            {
+              where: {
+                userId_conversationId:
+                  {
+                    userId:
+                      req.userId,
+                    conversationId,
+                  },
+              },
+            }
+          );
+
+        res.json(
+          updatedMembership
+        );
       } catch (error) {
         console.error(
           "Failed to mark conversation read:",
