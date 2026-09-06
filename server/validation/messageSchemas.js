@@ -16,6 +16,7 @@ const messageTextSchema =
 const createMessageSchema =
   z.object({
     text: messageTextSchema,
+    replyToMessageId: z.number().int().positive().nullable().optional(),
   });
 
 const updateMessageSchema =
@@ -23,7 +24,12 @@ const updateMessageSchema =
     text: messageTextSchema,
   });
 
+const reactionSchema = z.object({
+  emoji: z.string().trim().min(1).max(16),
+});
+
 module.exports = {
   createMessageSchema,
   updateMessageSchema,
+  reactionSchema,
 };

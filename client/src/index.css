@@ -207,6 +207,56 @@ Message Actions
   opacity: 0.6;
 }
 
+.message-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.message-reactions button,
+.reply-button {
+  border: 1px solid #ccc;
+  border-radius: 999px;
+  background: white;
+  cursor: pointer;
+  padding: 3px 7px;
+  font-size: 12px;
+}
+
+.message-reactions button.active {
+  border-color: #2563eb;
+  background: #dbeafe;
+}
+
+.reply-preview,
+.reply-composer-preview {
+  display: flex;
+  gap: 6px;
+  padding: 7px 9px;
+  border-left: 3px solid #60a5fa;
+  background: rgba(255, 255, 255, 0.65);
+  font-size: 12px;
+}
+
+.reply-preview {
+  flex-direction: column;
+}
+
+.message-composer {
+  border-top: 1px solid #ddd;
+}
+
+.reply-composer-preview {
+  justify-content: space-between;
+  margin: 10px 20px 0;
+}
+
+.reply-composer-preview button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
 /* ================================
 Message Editing
 ================================ */
@@ -276,7 +326,6 @@ Message Input
   display: flex;
   gap: 12px;
   padding: 20px;
-  border-top: 1px solid #ddd;
 }
 
 .message-input input {

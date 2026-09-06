@@ -8,6 +8,8 @@ function MessageInput({
   onSendMessage,
   onTypingStart,
   onTypingStop,
+  replyToMessage,
+  onCancelReply,
 }) {
   const [message, setMessage] = useState("");
 
@@ -58,9 +60,10 @@ function MessageInput({
     clearTimeout(typingTimeoutRef.current);
     stopTyping();
 
-    await onSendMessage(message);
+    await onSendMessage(message, replyToMessage?.id ?? null);
 
     setMessage("");
+    onCancelReply?.();
   };
 
   useEffect(() => {
@@ -70,6 +73,15 @@ function MessageInput({
   }, []);
 
   return (
+    <div className="message-composer">
+      {replyToMessage && (
+        <div className="reply-composer-preview">
+          <span>
+            Replying to {replyToMessage.sender.name}: {replyToMessage.text}
+          </span>
+          <button type="button" onClick={onCancelReply} aria-label="Cancel reply">×</button>
+        </div>
+      )}
     <form
       className="message-input"
       onSubmit={handleSubmit}
@@ -85,6 +97,7 @@ function MessageInput({
         Send
       </button>
     </form>
+    </div>
   );
 }
 

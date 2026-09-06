@@ -46,6 +46,7 @@ function App() {
     receiveMessageDelete,
     editMessage,
     deleteMessage,
+    toggleMessageReaction,
     loadOlderMessages,
     startTyping,
     stopTyping,
@@ -60,6 +61,13 @@ function App() {
   } = useConversations(
     user?.id
   );
+
+  const [replyToMessage, setReplyToMessage] = useState(null);
+
+  const handleSelectConversation = (conversationId) => {
+    setReplyToMessage(null);
+    selectConversation(conversationId);
+  };
 
   const {
     setInitialPresence,
@@ -306,7 +314,7 @@ function App() {
           selectedConversationId
         }
         onSelectConversation={
-          selectConversation
+          handleSelectConversation
         }
         onCreateConversation={
           createConversation
@@ -434,6 +442,8 @@ function App() {
                 onDeleteMessage={
                   deleteMessage
                 }
+                onToggleReaction={toggleMessageReaction}
+                onReply={setReplyToMessage}
               />
             )}
 
@@ -457,6 +467,8 @@ function App() {
               onSendMessage={
                 sendMessage
               }
+              replyToMessage={replyToMessage}
+              onCancelReply={() => setReplyToMessage(null)}
               onTypingStart={
                 handleTypingStart
               }

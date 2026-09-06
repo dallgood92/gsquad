@@ -35,6 +35,8 @@ function MessageList({
   olderMessagesLoading,
   onEditMessage,
   onDeleteMessage,
+  onToggleReaction,
+  onReply,
 }) {
   const listRef =
     useRef(null);
@@ -405,6 +407,14 @@ function MessageList({
               deletingMessageId ===
               message.id;
 
+            const reactions = Object.values(
+              (message.reactions ?? []).reduce((groups, reaction) => {
+                groups[reaction.emoji] ??= { emoji: reaction.emoji, users: [] };
+                groups[reaction.emoji].users.push(reaction.user);
+                return groups;
+              }, {})
+            );
+
             return (
               <div
                 key={message.id}
@@ -424,6 +434,13 @@ function MessageList({
                       .name
                   }
                 </span>
+
+                {message.replyToMessage && (
+                  <div className="reply-preview">
+                    <strong>{message.replyToMessage.sender.name}</strong>
+                    <span>{message.replyToMessage.deletedAt ? "Message deleted" : message.replyToMessage.text}</span>
+                  </div>
+                )}
 
                 {isDeleted ? (
                   <span className="message-text message-deleted-text">
@@ -521,6 +538,25 @@ function MessageList({
                     )}
                 </div>
 
+                {!isDeleted && (
+                  <div className="message-reactions">
+                    {reactions.map((reaction) => (
+                      <button
+                        type="button"
+                        key={reaction.emoji}
+                        className={reaction.users.some((user) => user.id === currentUser.id) ? "active" : ""}
+                        title={reaction.users.map((user) => user.name).join(", ")}
+                        onClick={() => onToggleReaction(message.id, reaction.emoji)}
+                      >
+                        {reaction.emoji} {reaction.users.length}
+                      </button>
+                    ))}
+                    {["👍", "❤️", "😂"].filter((emoji) => !reactions.some((reaction) => reaction.emoji === emoji)).map((emoji) => (
+                      <button type="button" className="reaction-add" key={emoji} onClick={() => onToggleReaction(message.id, emoji)}>{emoji}</button>
+                    ))}
+                  </div>
+                )}
+
                 {isOwnMessage &&
                   !isDeleted &&
                   !isEditing && (
@@ -553,6 +589,9 @@ function MessageList({
                       </button>
                     </div>
                   )}
+                {!isDeleted && !isEditing && (
+                  <button type="button" className="reply-button" onClick={() => onReply(message)}>Reply</button>
+                )}
               </div>
             );
           }

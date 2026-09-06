@@ -293,6 +293,28 @@ export async function deleteMessage(
   return response.json();
 }
 
+export async function toggleMessageReaction(
+  conversationId,
+  messageId,
+  emoji
+) {
+  const response = await fetch(
+    `${API_URL}/conversations/${conversationId}/messages/${messageId}/reactions`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emoji }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to update reaction");
+  }
+
+  return response.json();
+}
+
 export async function markConversationRead(
   conversationId,
   messageId

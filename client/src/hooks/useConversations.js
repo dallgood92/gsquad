@@ -13,6 +13,7 @@ import {
   markConversationRead as markConversationReadRequest,
   sendMessage as sendMessageRequest,
   updateMessage as updateMessageRequest,
+  toggleMessageReaction as toggleMessageReactionRequest,
 } from "../services/api";
 
 function mergeMessages(
@@ -952,6 +953,25 @@ function useConversations(
       }
     };
 
+  const toggleMessageReaction = async (messageId, emoji) => {
+    if (!selectedConversationId) return false;
+
+    try {
+      setError(null);
+      const updatedMessage = await toggleMessageReactionRequest(
+        selectedConversationId,
+        messageId,
+        emoji
+      );
+      receiveMessageUpdate(updatedMessage);
+      return true;
+    } catch (error) {
+      console.error("Failed to update reaction:", error);
+      setError(error.message);
+      return false;
+    }
+  };
+
   const loadOlderMessages =
     async () => {
       if (!selectedConversation) {
@@ -1116,7 +1136,7 @@ function useConversations(
     );
 
   const sendMessage =
-    async (text) => {
+    async (text, replyToMessageId = null) => {
       if (!text.trim()) {
         return;
       }
@@ -1133,9 +1153,9 @@ function useConversations(
         const newMessage =
           await sendMessageRequest(
             selectedConversationId,
-            {
-              text,
-            }
+            replyToMessageId
+              ? { text, replyToMessageId }
+              : { text }
           );
 
         receiveMessage(
@@ -1168,6 +1188,7 @@ function useConversations(
 
     editMessage,
     deleteMessage,
+    toggleMessageReaction,
 
     loadOlderMessages,
 

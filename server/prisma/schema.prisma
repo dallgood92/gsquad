@@ -14,6 +14,7 @@ model User {
   name        String
   avatarUrl   String?
   messages    Message[]
+  reactions   MessageReaction[]
   memberships ConversationMember[]
   createdAt   DateTime             @default(now())
 }
@@ -40,18 +41,37 @@ model ConversationMember {
 }
 
 model Message {
-  id             Int          @id @default(autoincrement())
-  text           String
+  id   Int    @id @default(autoincrement())
+  text String
 
-  senderId       Int
-  sender         User         @relation(fields: [senderId], references: [id])
+  senderId Int
+  sender   User @relation(fields: [senderId], references: [id])
 
   conversationId Int
   conversation   Conversation @relation(fields: [conversationId], references: [id])
 
-  createdAt      DateTime     @default(now())
-  editedAt       DateTime?
-  deletedAt      DateTime?
+  replyToMessageId Int?
+  replyToMessage   Message?          @relation("MessageReplies", fields: [replyToMessageId], references: [id])
+  replies          Message[]         @relation("MessageReplies")
+  reactions        MessageReaction[]
+
+  createdAt DateTime  @default(now())
+  editedAt  DateTime?
+  deletedAt DateTime?
 
   @@index([conversationId, id])
+  @@index([replyToMessageId])
+}
+
+model MessageReaction {
+  id        Int      @id @default(autoincrement())
+  emoji     String
+  userId    Int
+  messageId Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
 }
