@@ -96,10 +96,8 @@ function useConversations(
     setTypingUsers,
   ] = useState({});
 
-  const [
-    loading,
-    setLoading,
-  ] = useState(false);
+  const [loading, setLoading] =
+    useState(false);
 
   const [
     messagesLoading,
@@ -112,9 +110,12 @@ function useConversations(
   ] = useState(false);
 
   const [
-    error,
-    setError,
-  ] = useState(null);
+    syncing,
+    setSyncing,
+  ] = useState(false);
+
+  const [error, setError] =
+    useState(null);
 
   const conversationsRef =
     useRef([]);
@@ -132,6 +133,130 @@ function useConversations(
       selectedConversationId;
   }, [selectedConversationId]);
 
+  const normalizeConversations =
+    useCallback(
+      (
+        serverConversations,
+        existingConversations = []
+      ) => {
+        return sortConversations(
+          serverConversations.map(
+            (conversation) => {
+              const existing =
+                existingConversations.find(
+                  (
+                    currentConversation
+                  ) =>
+                    currentConversation.id ===
+                    conversation.id
+                );
+
+              return {
+                ...conversation,
+
+                messages:
+                  existing?.messages ??
+                  [],
+
+                messagesLoaded:
+                  existing
+                    ?.messagesLoaded ??
+                  false,
+
+                hasMoreMessages:
+                  existing
+                    ?.hasMoreMessages ??
+                  false,
+
+                nextMessageCursor:
+                  existing
+                    ?.nextMessageCursor ??
+                  null,
+
+                unreadCount:
+                  conversation.unreadCount ??
+                  0,
+
+                lastMessage:
+                  conversation.lastMessage ??
+                  null,
+              };
+            }
+          )
+        );
+      },
+      []
+    );
+
+  const loadConversations =
+    useCallback(
+      async () => {
+        if (!currentUserId) {
+          return;
+        }
+
+        try {
+          setLoading(true);
+          setError(null);
+
+          const data =
+            await getConversations();
+
+          const normalized =
+            normalizeConversations(
+              data
+            );
+
+          setConversations(
+            normalized
+          );
+
+          if (
+            normalized.length > 0
+          ) {
+            setSelectedConversationId(
+              (
+                currentSelectedId
+              ) => {
+                const stillExists =
+                  normalized.some(
+                    (
+                      conversation
+                    ) =>
+                      conversation.id ===
+                      currentSelectedId
+                  );
+
+                if (stillExists) {
+                  return currentSelectedId;
+                }
+
+                return normalized[0]
+                  .id;
+              }
+            );
+          } else {
+            setSelectedConversationId(
+              null
+            );
+          }
+        } catch (error) {
+          console.error(
+            "Failed to load conversations:",
+            error
+          );
+
+          setError(error.message);
+        } finally {
+          setLoading(false);
+        }
+      },
+      [
+        currentUserId,
+        normalizeConversations,
+      ]
+    );
+
   useEffect(() => {
     if (!currentUserId) {
       setConversations([]);
@@ -144,82 +269,17 @@ function useConversations(
       setOlderMessagesLoading(
         false
       );
+      setSyncing(false);
       setError(null);
 
       return;
     }
 
-    async function loadConversations() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const data =
-          await getConversations();
-
-        const conversationsWithMessageState =
-          data.map(
-            (conversation) => ({
-              ...conversation,
-
-              messages: [],
-
-              messagesLoaded:
-                false,
-
-              hasMoreMessages:
-                false,
-
-              nextMessageCursor:
-                null,
-
-              unreadCount:
-                conversation.unreadCount ??
-                0,
-
-              lastMessage:
-                conversation.lastMessage ??
-                null,
-            })
-          );
-
-        const sortedConversations =
-          sortConversations(
-            conversationsWithMessageState
-          );
-
-        setConversations(
-          sortedConversations
-        );
-
-        if (
-          sortedConversations.length >
-          0
-        ) {
-          setSelectedConversationId(
-            sortedConversations[0].id
-          );
-        } else {
-          setSelectedConversationId(
-            null
-          );
-        }
-      } catch (error) {
-        console.error(
-          "Failed to load conversations:",
-          error
-        );
-
-        setError(
-          error.message
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
     loadConversations();
-  }, [currentUserId]);
+  }, [
+    currentUserId,
+    loadConversations,
+  ]);
 
   const selectedConversation =
     conversations.find(
@@ -272,8 +332,7 @@ function useConversations(
                   return {
                     ...conversation,
 
-                    unreadCount:
-                      0,
+                    unreadCount: 0,
 
                     members:
                       conversation.members.map(
@@ -314,9 +373,7 @@ function useConversations(
       return;
     }
 
-    if (
-      !selectedConversationId
-    ) {
+    if (!selectedConversationId) {
       return;
     }
 
@@ -336,8 +393,8 @@ function useConversations(
     ) {
       const lastMessage =
         conversation.messages[
-          conversation.messages
-            .length - 1
+          conversation.messages.length -
+            1
         ];
 
       if (lastMessage) {
@@ -352,10 +409,7 @@ function useConversations(
 
     async function loadMessages() {
       try {
-        setMessagesLoading(
-          true
-        );
-
+        setMessagesLoading(true);
         setError(null);
 
         const conversationId =
@@ -388,8 +442,7 @@ function useConversations(
                       conversation.messages
                     ),
 
-                  messagesLoaded:
-                    true,
+                  messagesLoaded: true,
 
                   hasMoreMessages:
                     data.hasMore,
@@ -405,8 +458,7 @@ function useConversations(
 
         const lastMessage =
           data.messages[
-            data.messages.length -
-              1
+            data.messages.length - 1
           ];
 
         if (lastMessage) {
@@ -421,13 +473,9 @@ function useConversations(
           error
         );
 
-        setError(
-          error.message
-        );
+        setError(error.message);
       } finally {
-        setMessagesLoading(
-          false
-        );
+        setMessagesLoading(false);
       }
     }
 
@@ -438,9 +486,111 @@ function useConversations(
     markConversationRead,
   ]);
 
+  const resync =
+    useCallback(async () => {
+      if (!currentUserId) {
+        return;
+      }
+
+      try {
+        setSyncing(true);
+
+        const serverConversations =
+          await getConversations();
+
+        const selectedId =
+          selectedConversationIdRef.current;
+
+        let selectedMessagesData =
+          null;
+
+        if (selectedId) {
+          selectedMessagesData =
+            await getMessages(
+              selectedId
+            );
+        }
+
+        setConversations(
+          (
+            currentConversations
+          ) => {
+            const normalized =
+              normalizeConversations(
+                serverConversations,
+                currentConversations
+              );
+
+            return normalized.map(
+              (conversation) => {
+                if (
+                  conversation.id !==
+                    selectedId ||
+                  !selectedMessagesData
+                ) {
+                  return conversation;
+                }
+
+                return {
+                  ...conversation,
+
+                  messages:
+                    mergeMessages(
+                      conversation.messages,
+                      selectedMessagesData.messages
+                    ),
+
+                  messagesLoaded: true,
+
+                  hasMoreMessages:
+                    selectedMessagesData.hasMore,
+
+                  nextMessageCursor:
+                    selectedMessagesData.nextCursor,
+
+                  unreadCount: 0,
+                };
+              }
+            );
+          }
+        );
+
+        const latestMessage =
+          selectedMessagesData
+            ?.messages[
+              selectedMessagesData
+                .messages.length - 1
+            ];
+
+        if (
+          selectedId &&
+          latestMessage
+        ) {
+          await markConversationRead(
+            selectedId,
+            latestMessage.id
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Failed to resync conversations:",
+          error
+        );
+      } finally {
+        setSyncing(false);
+      }
+    }, [
+      currentUserId,
+      normalizeConversations,
+      markConversationRead,
+    ]);
+
   const selectConversation = (
     conversationId
   ) => {
+    selectedConversationIdRef.current =
+      conversationId;
+
     setSelectedConversationId(
       conversationId
     );
@@ -465,17 +615,10 @@ function useConversations(
             ...newConversation,
 
             messages: [],
-
             messagesLoaded: true,
-
-            hasMoreMessages:
-              false,
-
-            nextMessageCursor:
-              null,
-
+            hasMoreMessages: false,
+            nextMessageCursor: null,
             unreadCount: 0,
-
             lastMessage: null,
           };
 
@@ -489,6 +632,9 @@ function useConversations(
             ])
         );
 
+        selectedConversationIdRef.current =
+          newConversation.id;
+
         setSelectedConversationId(
           newConversation.id
         );
@@ -498,39 +644,38 @@ function useConversations(
           error
         );
 
-        setError(
-          error.message
-        );
+        setError(error.message);
       }
     };
 
-  const addMemberToConversation =
-    (membership) => {
-      setConversations(
-        (
-          currentConversations
-        ) =>
-          currentConversations.map(
-            (conversation) => {
-              if (
-                conversation.id ===
-                membership.conversationId
-              ) {
-                return {
-                  ...conversation,
+  const addMemberToConversation = (
+    membership
+  ) => {
+    setConversations(
+      (
+        currentConversations
+      ) =>
+        currentConversations.map(
+          (conversation) => {
+            if (
+              conversation.id ===
+              membership.conversationId
+            ) {
+              return {
+                ...conversation,
 
-                  members: [
-                    ...conversation.members,
-                    membership,
-                  ],
-                };
-              }
-
-              return conversation;
+                members: [
+                  ...conversation.members,
+                  membership,
+                ],
+              };
             }
-          )
-      );
-    };
+
+            return conversation;
+          }
+        )
+    );
+  };
 
   const receiveConversation =
     useCallback(
@@ -561,15 +706,9 @@ function useConversations(
                 ...newConversation,
 
                 messages: [],
-
-                messagesLoaded:
-                  false,
-
-                hasMoreMessages:
-                  false,
-
-                nextMessageCursor:
-                  null,
+                messagesLoaded: false,
+                hasMoreMessages: false,
+                nextMessageCursor: null,
 
                 unreadCount:
                   newConversation.unreadCount ??
@@ -607,14 +746,25 @@ function useConversations(
                     return conversation;
                   }
 
+                  const messageAlreadyExists =
+                    conversation.messages.some(
+                      (message) =>
+                        message.id ===
+                        newMessage.id
+                    );
+
                   return {
                     ...conversation,
 
                     messages:
-                      mergeMessages(
-                        conversation.messages,
-                        [newMessage]
-                      ),
+                      messageAlreadyExists
+                        ? conversation.messages
+                        : mergeMessages(
+                            conversation.messages,
+                            [
+                              newMessage,
+                            ]
+                          ),
 
                     lastMessage:
                       newMessage,
@@ -622,8 +772,10 @@ function useConversations(
                     unreadCount:
                       isSelectedConversation
                         ? 0
-                        : conversation.unreadCount +
-                          1,
+                        : messageAlreadyExists
+                          ? conversation.unreadCount
+                          : conversation.unreadCount +
+                            1,
                   };
                 }
               );
@@ -648,9 +800,7 @@ function useConversations(
 
   const loadOlderMessages =
     async () => {
-      if (
-        !selectedConversation
-      ) {
+      if (!selectedConversation) {
         return false;
       }
 
@@ -668,9 +818,7 @@ function useConversations(
         return false;
       }
 
-      if (
-        olderMessagesLoading
-      ) {
+      if (olderMessagesLoading) {
         return false;
       }
 
@@ -733,9 +881,7 @@ function useConversations(
           error
         );
 
-        setError(
-          error.message
-        );
+        setError(error.message);
 
         return false;
       } finally {
@@ -821,9 +967,7 @@ function useConversations(
         return;
       }
 
-      if (
-        !selectedConversationId
-      ) {
+      if (!selectedConversationId) {
         return;
       }
 
@@ -847,9 +991,7 @@ function useConversations(
           error
         );
 
-        setError(
-          error.message
-        );
+        setError(error.message);
       }
     };
 
@@ -858,18 +1000,27 @@ function useConversations(
     selectedConversation,
     selectedConversationId,
     selectedTypingUsers,
+
     selectConversation,
     createConversation,
     addMemberToConversation,
+
     receiveConversation,
     receiveMessage,
+
     loadOlderMessages,
+
     startTyping,
     stopTyping,
+
     sendMessage,
+
+    resync,
+
     loading,
     messagesLoading,
     olderMessagesLoading,
+    syncing,
     error,
   };
 }

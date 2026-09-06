@@ -6,19 +6,36 @@ import {
 } from "react";
 
 const WEBSOCKET_URL =
-  import.meta.env
-    .VITE_WEBSOCKET_URL ||
+  import.meta.env.VITE_WEBSOCKET_URL ||
   "ws://localhost:3001";
 
-const INITIAL_RECONNECT_DELAY =
-  1000;
+const INITIAL_RECONNECT_DELAY = 1000;
+const MAX_RECONNECT_DELAY = 30000;
 
-const MAX_RECONNECT_DELAY =
-  30000;
+function getReconnectDelay(
+  attempt
+) {
+  const exponentialDelay =
+    Math.min(
+      INITIAL_RECONNECT_DELAY *
+        2 ** attempt,
+      MAX_RECONNECT_DELAY
+    );
+
+  const jitter =
+    Math.random() *
+    exponentialDelay *
+    0.25;
+
+  return Math.round(
+    exponentialDelay + jitter
+  );
+}
 
 function useWebSocket(
   enabled,
-  onEvent
+  onEvent,
+  onReconnect
 ) {
   const socketRef =
     useRef(null);
@@ -29,11 +46,15 @@ function useWebSocket(
   const reconnectAttemptRef =
     useRef(0);
 
-  const [connected, setConnected] =
-    useState(false);
+  const hasConnectedRef =
+    useRef(false);
+
+  const [status, setStatus] =
+    useState("disconnected");
 
   useEffect(() => {
     if (!enabled) {
+      setStatus("disconnected");
       return;
     }
 
@@ -48,14 +69,14 @@ function useWebSocket(
         reconnectAttemptRef.current;
 
       const delay =
-        Math.min(
-          INITIAL_RECONNECT_DELAY *
-            2 ** attempt,
-          MAX_RECONNECT_DELAY
+        getReconnectDelay(
+          attempt
         );
 
       reconnectAttemptRef.current +=
         1;
+
+      setStatus("reconnecting");
 
       console.log(
         `WebSocket reconnecting in ${delay}ms`
@@ -86,6 +107,12 @@ function useWebSocket(
         return;
       }
 
+      setStatus(
+        hasConnectedRef.current
+          ? "reconnecting"
+          : "connecting"
+      );
+
       const socket =
         new WebSocket(
           WEBSOCKET_URL
@@ -98,11 +125,8 @@ function useWebSocket(
         "open",
         () => {
           console.log(
-            "WebSocket connection opened"
+            "WebSocket transport opened"
           );
-
-          reconnectAttemptRef.current =
-            0;
         }
       );
 
@@ -119,12 +143,20 @@ function useWebSocket(
               message.type ===
               "connection_ready"
             ) {
-              setConnected(
-                true
-              );
+              const wasReconnect =
+                hasConnectedRef.current;
+
+              hasConnectedRef.current =
+                true;
 
               reconnectAttemptRef.current =
                 0;
+
+              setStatus("connected");
+
+              if (wasReconnect) {
+                onReconnect?.();
+              }
             }
 
             onEvent?.(
@@ -144,10 +176,6 @@ function useWebSocket(
         () => {
           console.log(
             "WebSocket connection closed"
-          );
-
-          setConnected(
-            false
           );
 
           if (
@@ -178,7 +206,7 @@ function useWebSocket(
     return () => {
       cancelled = true;
 
-      setConnected(false);
+      setStatus("disconnected");
 
       if (
         reconnectTimeoutRef.current
@@ -204,6 +232,7 @@ function useWebSocket(
   }, [
     enabled,
     onEvent,
+    onReconnect,
   ]);
 
   const sendEvent =
@@ -213,14 +242,14 @@ function useWebSocket(
           socketRef.current;
 
         if (!socket) {
-          return;
+          return false;
         }
 
         if (
           socket.readyState !==
           WebSocket.OPEN
         ) {
-          return;
+          return false;
         }
 
         socket.send(
@@ -229,12 +258,18 @@ function useWebSocket(
             data,
           })
         );
+
+        return true;
       },
       []
     );
 
   return {
-    connected,
+    connected:
+      status === "connected",
+
+    status,
+
     sendEvent,
   };
 }

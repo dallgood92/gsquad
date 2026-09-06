@@ -15,11 +15,15 @@ import useConversations from "./hooks/useConversations";
 import usePresence from "./hooks/usePresence";
 import useWebSocket from "./hooks/useWebSocket";
 
-import { getServerHealth } from "./services/api";
+import {
+  getServerHealth,
+} from "./services/api";
 
 function App() {
-  const [serverStatus, setServerStatus] =
-    useState("checking");
+  const [
+    serverStatus,
+    setServerStatus,
+  ] = useState("checking");
 
   const {
     user,
@@ -42,11 +46,16 @@ function App() {
     startTyping,
     stopTyping,
     sendMessage,
-    loading: conversationsLoading,
+    resync,
+    loading:
+      conversationsLoading,
     messagesLoading,
     olderMessagesLoading,
+    syncing,
     error,
-  } = useConversations(user?.id);
+  } = useConversations(
+    user?.id
+  );
 
   const {
     setInitialPresence,
@@ -55,100 +64,120 @@ function App() {
     isUserOnline,
   } = usePresence();
 
-  const handleWebSocketEvent = useCallback(
-    (event) => {
-      switch (event.type) {
-        case "connection_ready":
-          setInitialPresence(
-            event.data.onlineUserIds
-          );
-          break;
+  const handleWebSocketEvent =
+    useCallback(
+      (event) => {
+        switch (event.type) {
+          case "connection_ready":
+            setInitialPresence(
+              event.data
+                .onlineUserIds
+            );
+            break;
 
-        case "message_created":
-          receiveMessage(
-            event.data.message
-          );
-          break;
+          case "message_created":
+            receiveMessage(
+              event.data.message
+            );
+            break;
 
-        case "conversation_added":
-          receiveConversation(
-            event.data.conversation
-          );
-          break;
+          case "conversation_added":
+            receiveConversation(
+              event.data
+                .conversation
+            );
+            break;
 
-        case "typing_started":
-          startTyping(
-            event.data.conversationId,
-            event.data.userId
-          );
-          break;
+          case "typing_started":
+            startTyping(
+              event.data
+                .conversationId,
+              event.data.userId
+            );
+            break;
 
-        case "typing_stopped":
-          stopTyping(
-            event.data.conversationId,
-            event.data.userId
-          );
-          break;
+          case "typing_stopped":
+            stopTyping(
+              event.data
+                .conversationId,
+              event.data.userId
+            );
+            break;
 
-        case "user_online":
-          setUserOnline(
-            event.data.userId
-          );
-          break;
+          case "user_online":
+            setUserOnline(
+              event.data.userId
+            );
+            break;
 
-        case "user_offline":
-          setUserOffline(
-            event.data.userId
-          );
-          break;
+          case "user_offline":
+            setUserOffline(
+              event.data.userId
+            );
+            break;
 
-        default:
-          console.log(
-            "Unhandled WebSocket event:",
-            event
-          );
-      }
-    },
-    [
-      receiveConversation,
-      receiveMessage,
-      setInitialPresence,
-      setUserOffline,
-      setUserOnline,
-      startTyping,
-      stopTyping,
-    ]
-  );
+          default:
+            console.log(
+              "Unhandled WebSocket event:",
+              event
+            );
+        }
+      },
+      [
+        receiveConversation,
+        receiveMessage,
+        setInitialPresence,
+        setUserOffline,
+        setUserOnline,
+        startTyping,
+        stopTyping,
+      ]
+    );
 
   const {
-    connected: websocketConnected,
+    connected,
+    status:
+      websocketStatus,
     sendEvent,
   } = useWebSocket(
     Boolean(user),
-    handleWebSocketEvent
+    handleWebSocketEvent,
+    resync
   );
 
-  const handleTypingStart = () => {
-    if (!selectedConversationId) {
-      return;
-    }
+  const handleTypingStart =
+    () => {
+      if (
+        !selectedConversationId
+      ) {
+        return;
+      }
 
-    sendEvent("typing_started", {
-      conversationId:
-        selectedConversationId,
-    });
-  };
+      sendEvent(
+        "typing_started",
+        {
+          conversationId:
+            selectedConversationId,
+        }
+      );
+    };
 
-  const handleTypingStop = () => {
-    if (!selectedConversationId) {
-      return;
-    }
+  const handleTypingStop =
+    () => {
+      if (
+        !selectedConversationId
+      ) {
+        return;
+      }
 
-    sendEvent("typing_stopped", {
-      conversationId:
-        selectedConversationId,
-    });
-  };
+      sendEvent(
+        "typing_stopped",
+        {
+          conversationId:
+            selectedConversationId,
+        }
+      );
+    };
 
   useEffect(() => {
     async function checkServerHealth() {
@@ -156,14 +185,18 @@ function App() {
         const data =
           await getServerHealth();
 
-        setServerStatus(data.status);
+        setServerStatus(
+          data.status
+        );
       } catch (error) {
         console.error(
           "Failed to connect to server:",
           error
         );
 
-        setServerStatus("offline");
+        setServerStatus(
+          "offline"
+        );
       }
     }
 
@@ -176,13 +209,19 @@ function App() {
 
   if (!user) {
     return (
-      <LoginPage onLogin={login} />
+      <LoginPage
+        onLogin={login}
+      />
     );
   }
 
-  if (conversationsLoading) {
+  if (
+    conversationsLoading
+  ) {
     return (
-      <p>Loading conversations...</p>
+      <p>
+        Loading conversations...
+      </p>
     );
   }
 
@@ -193,7 +232,8 @@ function App() {
     return (
       <div>
         <p>
-          Server: {serverStatus}
+          Server:{" "}
+          {serverStatus}
         </p>
 
         <p>{error}</p>
@@ -203,20 +243,47 @@ function App() {
 
   const typingNames =
     selectedConversation?.members
-      .filter((membership) =>
-        selectedTypingUsers.includes(
-          membership.user.id
-        )
+      .filter(
+        (membership) =>
+          selectedTypingUsers.includes(
+            membership.user.id
+          )
       )
       .map(
         (membership) =>
           membership.user.name
       ) || [];
 
+  const showConnectionBanner =
+    websocketStatus !==
+      "connected" ||
+    syncing;
+
+  const connectionMessage =
+    syncing
+      ? "Syncing missed messages..."
+      : websocketStatus ===
+          "connecting"
+        ? "Connecting to realtime..."
+        : websocketStatus ===
+            "reconnecting"
+          ? "Realtime connection lost. Reconnecting..."
+          : websocketStatus ===
+              "disconnected"
+            ? "Realtime disconnected"
+            : "";
+
+  const connectionClassName =
+    syncing
+      ? "connection-status connecting"
+      : `connection-status ${websocketStatus}`;
+
   return (
     <div className="app">
       <ConversationList
-        conversations={conversations}
+        conversations={
+          conversations
+        }
         selectedConversationId={
           selectedConversationId
         }
@@ -231,14 +298,15 @@ function App() {
       <main className="chat">
         <div>
           <p>
-            Server: {serverStatus}
+            Server:{" "}
+            {serverStatus}
           </p>
 
           <p>
             Realtime:{" "}
-            {websocketConnected
+            {connected
               ? "connected"
-              : "disconnected"}
+              : websocketStatus}
           </p>
 
           <p>
@@ -248,10 +316,24 @@ function App() {
             </strong>
           </p>
 
-          <button onClick={logout}>
+          <button
+            onClick={logout}
+          >
             Logout
           </button>
         </div>
+
+        {showConnectionBanner && (
+          <div
+            className={
+              connectionClassName
+            }
+          >
+            {
+              connectionMessage
+            }
+          </div>
+        )}
 
         {selectedConversation ? (
           <>
@@ -265,7 +347,9 @@ function App() {
 
                 <div className="member-list">
                   {selectedConversation.members.map(
-                    (membership) => (
+                    (
+                      membership
+                    ) => (
                       <span
                         key={
                           membership.userId
@@ -306,13 +390,17 @@ function App() {
             )}
 
             {messagesLoading ? (
-              <p>Loading messages...</p>
+              <p>
+                Loading messages...
+              </p>
             ) : (
               <MessageList
                 messages={
                   selectedConversation.messages
                 }
-                currentUser={user}
+                currentUser={
+                  user
+                }
                 hasMoreMessages={
                   selectedConversation.hasMoreMessages
                 }
@@ -326,10 +414,14 @@ function App() {
             )}
 
             <div className="typing-indicator">
-              {typingNames.length > 0 && (
+              {typingNames.length >
+                0 && (
                 <span>
-                  {typingNames.join(", ")}{" "}
-                  {typingNames.length === 1
+                  {typingNames.join(
+                    ", "
+                  )}{" "}
+                  {typingNames.length ===
+                  1
                     ? "is"
                     : "are"}{" "}
                   typing...
@@ -352,8 +444,9 @@ function App() {
         ) : (
           <div className="empty-chat">
             <p>
-              Create a conversation
-              to start messaging.
+              Create a
+              conversation to
+              start messaging.
             </p>
           </div>
         )}

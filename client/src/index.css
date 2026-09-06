@@ -1,5 +1,5 @@
 /* ================================
-   Global
+Global
 ================================ */
 
 * {
@@ -11,9 +11,8 @@ body {
   font-family: Arial, sans-serif;
 }
 
-
 /* ================================
-   App Layout
+App Layout
 ================================ */
 
 .app {
@@ -21,9 +20,8 @@ body {
   height: 100vh;
 }
 
-
 /* ================================
-   Conversation List
+Conversation List
 ================================ */
 
 .sidebar {
@@ -56,9 +54,8 @@ body {
   background: #ddd;
 }
 
-
 /* ================================
-   Chat
+Chat
 ================================ */
 
 .chat {
@@ -74,10 +71,41 @@ body {
   border-bottom: 1px solid #ddd;
 }
 
+/* ================================
+Connection Status
+================================ */
+
+.connection-status {
+  padding: 8px 20px;
+  font-size: 13px;
+  border-bottom: 1px solid #ddd;
+}
+
+.connection-status.connected {
+  display: none;
+}
+
+.connection-status.connecting,
+.connection-status.reconnecting {
+  background: #fef3c7;
+}
+
+.connection-status.disconnected {
+  background: #fee2e2;
+}
 
 /* ================================
-   Message List
+Message List
 ================================ */
+
+.message-list-container {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+}
 
 .message-list {
   flex: 1;
@@ -110,6 +138,11 @@ body {
   font-size: 16px;
 }
 
+.message-time {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
 .message-own {
   align-self: flex-end;
   background: #dbeafe;
@@ -119,9 +152,35 @@ body {
   align-self: flex-start;
 }
 
+.older-messages-loading {
+  align-self: center;
+  margin: 0;
+  font-size: 14px;
+}
+
+.new-messages-button {
+  position: absolute;
+  right: 24px;
+  bottom: 16px;
+
+  padding: 10px 14px;
+
+  border: 1px solid #ccc;
+  border-radius: 999px;
+
+  background: white;
+  cursor: pointer;
+
+  box-shadow: 0 2px 8px
+    rgba(0, 0, 0, 0.15);
+}
+
+.new-messages-button:hover {
+  background: #f5f5f5;
+}
 
 /* ================================
-   Message Input
+Message Input
 ================================ */
 
 .message-input {
@@ -149,7 +208,7 @@ body {
 }
 
 /* ================================
-   Login Page
+Login Page
 ================================ */
 
 .login-page {
@@ -177,6 +236,10 @@ body {
   margin-bottom: 24px;
 }
 
+/* ================================
+Members / Presence
+================================ */
+
 .member-list {
   display: flex;
   flex-wrap: wrap;
@@ -200,10 +263,4 @@ body {
 
 .presence-dot.online {
   background: #22c55e;
-}
-
-.older-messages-loading {
-  align-self: center;
-  margin: 0;
-  font-size: 14px;
 }
