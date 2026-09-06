@@ -27,14 +27,22 @@ module.exports = function createConversationRoutes(
                 user: true,
               },
             },
-          },
 
-          orderBy: {
-            createdAt: "asc",
+            messages: {
+              orderBy: {
+                id: "desc",
+              },
+
+              take: 1,
+
+              include: {
+                sender: true,
+              },
+            },
           },
         });
 
-      const conversationsWithUnreadCounts =
+      const conversationsWithDetails =
         await Promise.all(
           conversations.map(
             async (conversation) => {
@@ -67,16 +75,56 @@ module.exports = function createConversationRoutes(
                   },
                 });
 
+              const lastMessage =
+                conversation.messages[0] ??
+                null;
+
+              const {
+                messages,
+                ...conversationWithoutMessages
+              } = conversation;
+
               return {
-                ...conversation,
+                ...conversationWithoutMessages,
                 unreadCount,
+                lastMessage,
               };
             }
           )
         );
 
+      conversationsWithDetails.sort(
+        (
+          firstConversation,
+          secondConversation
+        ) => {
+          const firstActivity =
+            firstConversation.lastMessage
+              ?.id ?? 0;
+
+          const secondActivity =
+            secondConversation.lastMessage
+              ?.id ?? 0;
+
+          if (
+            firstActivity ===
+            secondActivity
+          ) {
+            return (
+              secondConversation.id -
+              firstConversation.id
+            );
+          }
+
+          return (
+            secondActivity -
+            firstActivity
+          );
+        }
+      );
+
       res.json(
-        conversationsWithUnreadCounts
+        conversationsWithDetails
       );
     } catch (error) {
       console.error(
@@ -135,6 +183,7 @@ module.exports = function createConversationRoutes(
       res.status(201).json({
         ...conversation,
         unreadCount: 0,
+        lastMessage: null,
       });
     } catch (error) {
       console.error(
@@ -155,8 +204,7 @@ module.exports = function createConversationRoutes(
       try {
         const conversationId =
           Number(
-            req.params
-              .conversationId
+            req.params.conversationId
           );
 
         const messageId =
@@ -170,49 +218,38 @@ module.exports = function createConversationRoutes(
           ) ||
           conversationId <= 0
         ) {
-          return res
-            .status(400)
-            .json({
-              error:
-                "Invalid conversation ID",
-            });
+          return res.status(400).json({
+            error:
+              "Invalid conversation ID",
+          });
         }
 
         if (
-          !Number.isInteger(
-            messageId
-          ) ||
+          !Number.isInteger(messageId) ||
           messageId <= 0
         ) {
-          return res
-            .status(400)
-            .json({
-              error:
-                "Invalid message ID",
-            });
+          return res.status(400).json({
+            error:
+              "Invalid message ID",
+          });
         }
 
         const membership =
-          await prisma.conversationMember.findUnique(
-            {
-              where: {
-                userId_conversationId:
-                  {
-                    userId:
-                      req.userId,
-                    conversationId,
-                  },
+          await prisma.conversationMember.findUnique({
+            where: {
+              userId_conversationId: {
+                userId:
+                  req.userId,
+                conversationId,
               },
-            }
-          );
+            },
+          });
 
         if (!membership) {
-          return res
-            .status(403)
-            .json({
-              error:
-                "You are not a member of this conversation",
-            });
+          return res.status(403).json({
+            error:
+              "You are not a member of this conversation",
+          });
         }
 
         const message =
@@ -228,56 +265,48 @@ module.exports = function createConversationRoutes(
           });
 
         if (!message) {
-          return res
-            .status(404)
-            .json({
-              error:
-                "Message not found in this conversation",
-            });
+          return res.status(404).json({
+            error:
+              "Message not found in this conversation",
+          });
         }
 
-        await prisma.conversationMember.updateMany(
-          {
-            where: {
-              userId:
-                req.userId,
+        await prisma.conversationMember.updateMany({
+          where: {
+            userId:
+              req.userId,
 
-              conversationId,
+            conversationId,
 
-              OR: [
-                {
-                  lastReadMessageId:
-                    null,
+            OR: [
+              {
+                lastReadMessageId:
+                  null,
+              },
+              {
+                lastReadMessageId: {
+                  lt: messageId,
                 },
-                {
-                  lastReadMessageId:
-                    {
-                      lt: messageId,
-                    },
-                },
-              ],
-            },
+              },
+            ],
+          },
 
-            data: {
-              lastReadMessageId:
-                messageId,
-            },
-          }
-        );
+          data: {
+            lastReadMessageId:
+              messageId,
+          },
+        });
 
         const updatedMembership =
-          await prisma.conversationMember.findUnique(
-            {
-              where: {
-                userId_conversationId:
-                  {
-                    userId:
-                      req.userId,
-                    conversationId,
-                  },
+          await prisma.conversationMember.findUnique({
+            where: {
+              userId_conversationId: {
+                userId:
+                  req.userId,
+                conversationId,
               },
-            }
-          );
+            },
+          });
 
         res.json(
           updatedMembership
