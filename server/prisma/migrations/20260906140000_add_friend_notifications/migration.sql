@@ -1,0 +1,6 @@
+CREATE TYPE "NotificationType" AS ENUM ('MENTION', 'FRIEND_ACCEPTED');
+
+ALTER TABLE "Notification"
+ADD COLUMN "type" "NotificationType" NOT NULL DEFAULT 'MENTION',
+ALTER COLUMN "conversationId" DROP NOT NULL,
+ALTER COLUMN "messageId" DROP NOT NULL;

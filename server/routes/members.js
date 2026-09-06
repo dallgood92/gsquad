@@ -44,20 +44,14 @@ module.exports = function createMemberRoutes(
 
         const { userId } = result.data;
 
-        const requesterMembership =
-          await prisma.conversationMember.findUnique({
-            where: {
-              userId_conversationId: {
-                userId: req.userId,
-                conversationId,
-              },
-            },
-          });
+        const conversation = await prisma.conversation.findUnique({
+          where: { id: conversationId },
+        });
 
-        if (requesterMembership?.role !== "ADMIN") {
+        if (!conversation || conversation.type !== "GROUP" || conversation.createdById !== req.userId) {
           return res.status(403).json({
             error:
-              "Only admins can add members",
+              "Only the group creator can invite members",
           });
         }
 
@@ -103,7 +97,7 @@ module.exports = function createMemberRoutes(
             },
           });
 
-        const conversation =
+        const updatedConversation =
           await prisma.conversation.findUnique({
             where: {
               id: conversationId,
@@ -129,7 +123,7 @@ module.exports = function createMemberRoutes(
 
             data: {
               conversation: {
-                ...conversation,
+                ...updatedConversation,
                 unreadCount: 0,
               },
             },
@@ -166,9 +160,43 @@ module.exports = function createMemberRoutes(
       });
       if (!requester || (req.userId !== userId && requester.role !== "ADMIN")) return res.status(403).json({ error: "You cannot remove this member" });
       if (!target) return res.status(404).json({ error: "Membership not found" });
-      if (target.role === "ADMIN") {
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        include: { members: { orderBy: { joinedAt: "asc" } } },
+      });
+      const remainingMembers = conversation.members.filter((member) => member.userId !== userId);
+
+      if (req.userId === userId && remainingMembers.length === 0 && conversation.type === "GROUP") {
+        await prisma.$transaction([
+          prisma.notification.deleteMany({ where: { conversationId } }),
+          prisma.message.updateMany({
+            where: { conversationId, replyToMessageId: { not: null } },
+            data: { replyToMessageId: null },
+          }),
+          prisma.message.deleteMany({ where: { conversationId } }),
+          prisma.conversationMember.deleteMany({ where: { conversationId } }),
+          prisma.conversation.delete({ where: { id: conversationId } }),
+        ]);
+        return res.json({ success: true, userId, conversationId, deletedGroup: true });
+      }
+
+      if (req.userId === userId && target.role === "ADMIN") {
+        const adminCount = conversation.members.filter((member) => member.role === "ADMIN").length;
+        if (adminCount === 1 && remainingMembers.length > 0) {
+          await prisma.conversationMember.update({
+            where: { userId_conversationId: { userId: remainingMembers[0].userId, conversationId } },
+            data: { role: "ADMIN" },
+          });
+        }
+      } else if (target.role === "ADMIN") {
         const adminCount = await prisma.conversationMember.count({ where: { conversationId, role: "ADMIN" } });
         if (adminCount === 1) return res.status(409).json({ error: "Assign another admin before the last admin leaves" });
+      }
+      if (req.userId === userId && conversation.createdById === userId) {
+        await prisma.conversation.update({
+          where: { id: conversationId },
+          data: { createdById: remainingMembers[0]?.userId ?? null },
+        });
       }
       await prisma.conversationMember.delete({ where: { userId_conversationId: { userId, conversationId } } });
       res.json({ success: true, userId, conversationId });

@@ -19,7 +19,40 @@ model User {
   notifications        Notification[]       @relation("NotificationRecipient")
   notificationsCreated Notification[]       @relation("NotificationActor")
   memberships          ConversationMember[]
+  friendships          Friendship[]         @relation("FriendshipOwner")
+  friendedBy           Friendship[]         @relation("FriendshipFriend")
+  createdConversations Conversation[]       @relation("ConversationCreator")
+  blockedUsers         UserBlock[]          @relation("BlockOwner")
+  blockedBy            UserBlock[]          @relation("BlockedUser")
   createdAt            DateTime             @default(now())
+}
+
+model UserBlock {
+  blockerId Int
+  blockedId Int
+  blocker   User     @relation("BlockOwner", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("BlockedUser", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+model Friendship {
+  userId    Int
+  friendId  Int
+  user      User     @relation("FriendshipOwner", fields: [userId], references: [id], onDelete: Cascade)
+  friend    User     @relation("FriendshipFriend", fields: [friendId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  status    FriendshipStatus @default(PENDING)
+
+  @@id([userId, friendId])
+  @@index([friendId])
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
 }
 
 model Conversation {
@@ -27,10 +60,14 @@ model Conversation {
   name          String
   type          ConversationType     @default(GROUP)
   directKey     String?              @unique
+  createdById   Int?
+  createdBy     User?                @relation("ConversationCreator", fields: [createdById], references: [id], onDelete: SetNull)
   messages      Message[]
   members       ConversationMember[]
   notifications Notification[]
   createdAt     DateTime             @default(now())
+
+  @@index([createdById])
 }
 
 enum ConversationType {
@@ -76,6 +113,7 @@ model Message {
   reactions        MessageReaction[]
   pins             MessagePin[]
   notifications    Notification[]
+  attachments      MessageAttachment[]
 
   createdAt DateTime  @default(now())
   editedAt  DateTime?
@@ -83,6 +121,22 @@ model Message {
 
   @@index([conversationId, id])
   @@index([replyToMessageId])
+}
+
+model MessageAttachment {
+  id           Int      @id @default(autoincrement())
+  messageId    Int
+  message      Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  storageKey   String   @unique
+  originalName String
+  mimeType     String
+  size         Int
+  width        Int?
+  height       Int?
+  duration     Float?
+  createdAt    DateTime @default(now())
+
+  @@index([messageId])
 }
 
 model MessageReaction {
@@ -111,17 +165,23 @@ model MessagePin {
 
 model Notification {
   id             Int          @id @default(autoincrement())
+  type           NotificationType @default(MENTION)
   userId         Int
   actorId        Int
-  conversationId Int
-  messageId      Int
+  conversationId Int?
+  messageId      Int?
   user           User         @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Cascade)
   actor          User         @relation("NotificationActor", fields: [actorId], references: [id], onDelete: Cascade)
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  message        Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message        Message?      @relation(fields: [messageId], references: [id], onDelete: Cascade)
   readAt         DateTime?
   createdAt      DateTime     @default(now())
 
   @@unique([userId, messageId])
   @@index([userId, readAt, id])
+}
+
+enum NotificationType {
+  MENTION
+  FRIEND_ACCEPTED
 }

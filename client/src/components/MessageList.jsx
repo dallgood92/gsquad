@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
 } from "react";
+import Avatar from "./Avatar";
 
 const LOAD_MORE_THRESHOLD = 100;
 const NEAR_BOTTOM_THRESHOLD = 100;
@@ -31,12 +32,12 @@ function MessageList({
   messages,
   currentUser,
   members,
+  showSenderNames,
   hasMoreMessages,
   onLoadOlderMessages,
   olderMessagesLoading,
   onEditMessage,
   onDeleteMessage,
-  onToggleReaction,
   onReply,
   onTogglePin,
   onRetryMessage,
@@ -80,6 +81,10 @@ function MessageList({
     deletingMessageId,
     setDeletingMessageId,
   ] = useState(null);
+
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [confirmDeleteMessageId, setConfirmDeleteMessageId] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
 
   const isNearBottom = () => {
     const list =
@@ -241,23 +246,22 @@ function MessageList({
 
   const handleDelete =
     async (messageId) => {
-      const shouldDelete =
-        window.confirm(
-          "Delete this message?"
-        );
-
-      if (!shouldDelete) {
-        return;
-      }
-
       try {
+        setDeleteError("");
         setDeletingMessageId(
           messageId
         );
 
-        await onDeleteMessage(
+        const deleted = await onDeleteMessage(
           messageId
         );
+
+        if (!deleted) {
+          setDeleteError("The message could not be deleted. Please try again.");
+          return;
+        }
+
+        setConfirmDeleteMessageId(null);
 
         if (
           editingMessageId ===
@@ -352,6 +356,15 @@ function MessageList({
   }, [messages]);
 
   useEffect(() => {
+    if (!openMenuId) return undefined;
+    const closeMenu = (event) => {
+      if (!event.target.closest(".message-menu")) setOpenMenuId(null);
+    };
+    document.addEventListener("pointerdown", closeMenu);
+    return () => document.removeEventListener("pointerdown", closeMenu);
+  }, [openMenuId]);
+
+  useEffect(() => {
     if (!editingMessageId) {
       return;
     }
@@ -374,6 +387,8 @@ function MessageList({
     editingMessageId,
   ]);
 
+  const rootMessages = messages.filter((message) => !message.replyToMessageId && !message.deletedAt);
+
   return (
     <div className="message-list-container">
       <div
@@ -387,8 +402,8 @@ function MessageList({
           </p>
         )}
 
-        {messages.filter((message) => !message.replyToMessageId).map(
-          (message) => {
+        {rootMessages.map(
+          (message, messageIndex) => {
             const isOwnMessage =
               message.senderId ===
               currentUser.id;
@@ -410,39 +425,54 @@ function MessageList({
               deletingMessageId ===
               message.id;
 
-            const reactions = Object.values(
-              (message.reactions ?? []).reduce((groups, reaction) => {
-                groups[reaction.emoji] ??= { emoji: reaction.emoji, users: [] };
-                groups[reaction.emoji].users.push(reaction.user);
-                return groups;
-              }, {})
-            );
             const readers = isOwnMessage
               ? members.filter((membership) =>
                   membership.userId !== currentUser.id &&
                   (membership.lastReadMessageId ?? 0) >= message.id
                 )
               : [];
+            const previousMessage = rootMessages[messageIndex - 1];
+            const nextMessage = rootMessages[messageIndex + 1];
+            const startsGroup = previousMessage?.senderId !== message.senderId;
+            const endsGroup = nextMessage?.senderId !== message.senderId;
 
             return (
               <div
                 key={message.id}
-                className={`message ${
+                className={`message-row ${
                   isOwnMessage
-                    ? "message-own"
-                    : "message-other"
+                    ? "message-row-own"
+                    : "message-row-other"
                 } ${
                   isDeleted
                     ? "message-deleted"
                     : ""
+                } ${
+                  startsGroup
+                    ? "message-group-start"
+                    : ""
+                } ${
+                  endsGroup
+                    ? "message-group-end"
+                    : ""
                 }`}
               >
-                <span className="message-sender">
-                  {
-                    message.sender
-                      .name
-                  }
-                </span>
+                {showSenderNames && !isOwnMessage && startsGroup && (
+                  <span className="message-sender">
+                    {
+                      message.sender
+                        .name
+                    }
+                  </span>
+                )}
+
+                <div className="message-line">
+                {!isOwnMessage && (
+                  <span className="message-avatar-slot">
+                    {endsGroup && <Avatar user={message.sender} size="small" />}
+                  </span>
+                )}
+                <div className={`message ${isOwnMessage ? "message-own" : "message-other"}`}>
 
                 {message.replyToMessage && (
                   <div className="reply-preview">
@@ -526,104 +556,71 @@ function MessageList({
                       </button>
                     </div>
                   </div>
-                ) : (
+                ) : message.text ? (
                   <span className="message-text">
                     {message.text}
                   </span>
-                )}
+                ) : null}
 
-                <div className="message-meta">
-                  <span className="message-time">
-                    {formatMessageTime(
-                      message.createdAt
-                    )}
-                  </span>
-
-                  {!isDeleted &&
-                    message.editedAt && (
-                      <span className="message-edited">
-                        (edited)
-                      </span>
-                    )}
-                  {message.deliveryStatus && (
-                    <span className={`message-delivery ${message.deliveryStatus}`}>
-                      {message.deliveryStatus === "sending" ? "Sending…" : "Failed"}
-                    </span>
-                  )}
-                  {!message.isOptimistic && readers.length > 0 && (
-                    <span className="message-seen" title={readers.map((membership) => membership.user.name).join(", ")}>
-                      Seen{readers.length > 1 ? ` by ${readers.length}` : ""}
-                    </span>
-                  )}
-                </div>
+                {!isDeleted && message.attachments?.map((attachment) => attachment.mimeType.startsWith("video/") ? (
+                  <video className="message-attachment message-video" key={attachment.id ?? attachment.storageKey} src={attachment.url} controls playsInline preload="metadata" />
+                ) : (
+                  <a className="message-attachment-link" key={attachment.id ?? attachment.storageKey} href={attachment.url} target="_blank" rel="noreferrer">
+                    <img className="message-attachment message-image" src={attachment.url} alt={attachment.originalName} loading="lazy" />
+                  </a>
+                ))}
 
                 {message.deliveryStatus === "failed" && (
                   <button type="button" className="retry-message" onClick={() => onRetryMessage(message.id)}>Retry</button>
                 )}
 
-                {!isDeleted && (
-                  <div className="message-reactions">
-                    {reactions.map((reaction) => (
-                      <button
-                        type="button"
-                        key={reaction.emoji}
-                        className={reaction.users.some((user) => user.id === currentUser.id) ? "active" : ""}
-                        title={reaction.users.map((user) => user.name).join(", ")}
-                        onClick={() => onToggleReaction(message.id, reaction.emoji)}
-                      >
-                        {reaction.emoji} {reaction.users.length}
-                      </button>
-                    ))}
-                    {["👍", "❤️", "😂"].filter((emoji) => !reactions.some((reaction) => reaction.emoji === emoji)).map((emoji) => (
-                      <button type="button" className="reaction-add" key={emoji} onClick={() => onToggleReaction(message.id, emoji)}>{emoji}</button>
-                    ))}
+                {!isDeleted && !isEditing && !message.isOptimistic && (
+                  <div className="message-menu">
+                    <button
+                      type="button"
+                      className="message-menu-trigger"
+                      aria-label="Message actions"
+                      aria-expanded={openMenuId === message.id}
+                      onClick={() => setOpenMenuId((current) => current === message.id ? null : message.id)}
+                    ><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+                    {openMenuId === message.id && (
+                      <div className="message-menu-popover">
+                        <button type="button" onClick={() => { onReply(message); setOpenMenuId(null); }}>
+                          {messages.some((candidate) => candidate.replyToMessageId === message.id) ? "View thread" : "Reply"}
+                        </button>
+                        <button type="button" onClick={() => { onTogglePin(message.id); setOpenMenuId(null); }}>{message.pins?.length ? "Unpin message" : "Pin message"}</button>
+                        {isOwnMessage && message.text && <button type="button" onClick={() => { startEditing(message); setOpenMenuId(null); }}>Edit message</button>}
+                        {isOwnMessage && <button type="button" className="danger-action" disabled={isDeleting} onClick={() => { setDeleteError(""); setConfirmDeleteMessageId(message.id); setOpenMenuId(null); }}>Delete message</button>}
+                      </div>
+                    )}
+                  </div>
+                )}
+                </div>
+                </div>
+
+                {confirmDeleteMessageId === message.id && (
+                  <div className="message-delete-confirm" role="dialog" aria-label="Confirm message deletion">
+                    <span>{deleteError || "Delete this message?"}</span>
+                    <div>
+                      <button type="button" disabled={isDeleting} onClick={() => { setConfirmDeleteMessageId(null); setDeleteError(""); }}>Cancel</button>
+                      <button type="button" className="danger-action" disabled={isDeleting} onClick={() => handleDelete(message.id)}>{isDeleting ? "Deleting…" : "Delete"}</button>
+                    </div>
                   </div>
                 )}
 
-                {isOwnMessage && !message.isOptimistic &&
-                  !isDeleted &&
-                  !isEditing && (
-                    <div className="message-actions">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          startEditing(
-                            message
-                          )
-                        }
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleDelete(
-                            message.id
-                          )
-                        }
-                        disabled={
-                          isDeleting
-                        }
-                      >
-                        {isDeleting
-                          ? "Deleting..."
-                          : "Delete"}
-                      </button>
-                    </div>
+                <div className={`message-meta ${endsGroup ? "message-meta-visible" : ""}`}>
+                  <span className="message-time">
+                    {formatMessageTime(message.createdAt)}{readers.length > 0 ? " · Read" : ""}
+                  </span>
+                  {!isDeleted && message.editedAt && (
+                    <span className="message-edited">Edited</span>
                   )}
-                {!isDeleted && !isEditing && !message.isOptimistic && (
-                  <button type="button" className="reply-button" onClick={() => onReply(message)}>
-                    {messages.filter((candidate) => candidate.replyToMessageId === message.id).length
-                      ? `View thread (${messages.filter((candidate) => candidate.replyToMessageId === message.id).length})`
-                      : "Reply"}
-                  </button>
-                )}
-                {!isDeleted && !isEditing && !message.isOptimistic && (
-                  <button type="button" className="pin-button" onClick={() => onTogglePin(message.id)}>
-                    {message.pins?.length ? "Unpin" : "Pin"}
-                  </button>
-                )}
+                  {message.deliveryStatus && (
+                    <span className={`message-delivery ${message.deliveryStatus}`}>
+                      {message.deliveryStatus === "sending" ? "Sending…" : "Failed"}
+                    </span>
+                  )}
+                </div>
               </div>
             );
           }

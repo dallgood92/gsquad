@@ -751,6 +751,18 @@ function useConversations(
       []
     );
 
+  const receiveConversationDelete = useCallback((conversationId) => {
+    setConversations((currentConversations) => {
+      const remaining = currentConversations.filter((conversation) => conversation.id !== conversationId);
+      if (selectedConversationIdRef.current === conversationId) {
+        const nextConversationId = remaining[0]?.id ?? null;
+        selectedConversationIdRef.current = nextConversationId;
+        setSelectedConversationId(nextConversationId);
+      }
+      return remaining;
+    });
+  }, []);
+
   const receiveMessage =
     useCallback(
       (newMessage) => {
@@ -890,6 +902,23 @@ function useConversations(
               members: conversation.members.map((membership) =>
                 membership.userId === userId
                   ? { ...membership, lastReadMessageId: messageId }
+                  : membership
+              ),
+            }
+      )
+    );
+  }, []);
+
+  const receiveMembershipUpdate = useCallback((updatedMembership) => {
+    setConversations((currentConversations) =>
+      currentConversations.map((conversation) =>
+        conversation.id !== updatedMembership.conversationId
+          ? conversation
+          : {
+              ...conversation,
+              members: conversation.members.map((membership) =>
+                membership.userId === updatedMembership.userId
+                  ? { ...membership, ...updatedMembership }
                   : membership
               ),
             }
@@ -1170,8 +1199,8 @@ function useConversations(
     );
 
   const sendMessage =
-    async (text, replyToMessageId = null) => {
-      if (!text.trim()) {
+    async (text, replyToMessageId = null, attachment = null) => {
+      if (!text.trim() && !attachment) {
         return;
       }
 
@@ -1198,6 +1227,7 @@ function useConversations(
           : null,
         reactions: [],
         pins: [],
+        attachments: attachment ? [{ ...attachment, url: attachment.previewUrl }] : [],
         createdAt: new Date().toISOString(),
         editedAt: null,
         deletedAt: null,
@@ -1223,9 +1253,7 @@ function useConversations(
         const newMessage =
           await sendMessageRequest(
             conversationId,
-            replyToMessageId
-              ? { text, replyToMessageId }
-              : { text }
+            { text, ...(replyToMessageId && { replyToMessageId }), ...(attachment && { attachment }) }
           );
 
         setConversations((currentConversations) =>
@@ -1282,7 +1310,7 @@ function useConversations(
         };
       })
     );
-    return sendMessage(failedMessage.text, failedMessage.replyToMessageId);
+    return sendMessage(failedMessage.text, failedMessage.replyToMessageId, failedMessage.attachments?.[0] ?? null);
   };
 
   return {
@@ -1296,10 +1324,12 @@ function useConversations(
     addMemberToConversation,
 
     receiveConversation,
+    receiveConversationDelete,
     receiveMessage,
     receiveMessageUpdate,
     receiveMessageDelete,
     receiveReadReceipt,
+    receiveMembershipUpdate,
 
     editMessage,
     deleteMessage,

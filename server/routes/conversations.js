@@ -8,7 +8,8 @@ const router = express.Router();
 
 module.exports = function createConversationRoutes(
   prisma,
-  redis
+  redis,
+  storage
 ) {
   router.get("/", async (req, res) => {
     try {
@@ -145,7 +146,7 @@ module.exports = function createConversationRoutes(
     try {
       const memberships = await prisma.conversationMember.findMany({
         where: { userId: req.userId, archivedAt: { not: null } },
-        include: { conversation: { select: { id: true, name: true, createdAt: true } } },
+        include: { conversation: { select: { id: true, name: true, type: true, createdAt: true } } },
         orderBy: { archivedAt: "desc" },
       });
       res.json({ conversations: memberships.map((membership) => ({ ...membership.conversation, archivedAt: membership.archivedAt })) });
@@ -178,6 +179,7 @@ module.exports = function createConversationRoutes(
         await prisma.conversation.create({
           data: {
             name,
+            createdById: req.userId,
 
             members: {
               create: {
@@ -224,6 +226,17 @@ module.exports = function createConversationRoutes(
       const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
       if (!targetUser) return res.status(404).json({ error: "User not found" });
 
+      const friendship = await prisma.friendship.findFirst({
+        where: {
+          status: "ACCEPTED",
+          OR: [
+            { userId: req.userId, friendId: targetUserId },
+            { userId: targetUserId, friendId: req.userId },
+          ],
+        },
+      });
+      if (!friendship) return res.status(403).json({ error: "You can only message accepted friends" });
+
       const directKey = [req.userId, targetUserId].sort((a, b) => a - b).join(":");
       let conversation = await prisma.conversation.findUnique({
         where: { directKey },
@@ -252,9 +265,22 @@ module.exports = function createConversationRoutes(
           event: { type: "conversation_added", data: { conversation: { ...conversation, unreadCount: 0, lastMessage: null } } },
         });
       } else {
-        await prisma.conversationMember.update({
-          where: { userId_conversationId: { userId: req.userId, conversationId: conversation.id } },
-          data: { archivedAt: null },
+        await prisma.$transaction([
+          prisma.conversationMember.upsert({
+            where: { userId_conversationId: { userId: req.userId, conversationId: conversation.id } },
+            create: { userId: req.userId, conversationId: conversation.id, role: "ADMIN" },
+            update: { archivedAt: null },
+          }),
+          prisma.conversationMember.upsert({
+            where: { userId_conversationId: { userId: targetUserId, conversationId: conversation.id } },
+            create: { userId: targetUserId, conversationId: conversation.id, role: "ADMIN" },
+            update: { archivedAt: null },
+          }),
+        ]);
+
+        conversation = await prisma.conversation.findUnique({
+          where: { id: conversation.id },
+          include: { members: { include: { user: true } } },
         });
       }
 
@@ -425,6 +451,52 @@ module.exports = function createConversationRoutes(
       res.status(500).json({ error: "Failed to rename conversation" });
     }
   });
+
+  const deleteConversation = async (req, res) => {
+    try {
+      const conversationId = Number(req.params.conversationId);
+      if (!Number.isInteger(conversationId)) return res.status(400).json({ error: "Invalid conversation" });
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        include: { members: true },
+      });
+      if (!conversation) return res.status(404).json({ error: "Conversation not found" });
+      const isMember = conversation.members.some((member) => member.userId === req.userId);
+      if (conversation.type === "DIRECT" && !isMember) return res.status(403).json({ error: "You cannot delete this conversation" });
+      if (conversation.type !== "DIRECT" && conversation.createdById !== req.userId) {
+        return res.status(403).json({ error: "Only the group owner can delete this group" });
+      }
+      const recipientUserIds = conversation.members.map((member) => member.userId);
+      const attachmentKeys = await prisma.messageAttachment.findMany({
+        where: { message: { conversationId } },
+        select: { storageKey: true },
+      });
+      await prisma.$transaction([
+        prisma.notification.deleteMany({ where: { conversationId } }),
+        prisma.message.updateMany({
+          where: { conversationId, replyToMessageId: { not: null } },
+          data: { replyToMessageId: null },
+        }),
+        prisma.messagePin.deleteMany({ where: { message: { conversationId } } }),
+        prisma.messageReaction.deleteMany({ where: { message: { conversationId } } }),
+        prisma.message.deleteMany({ where: { conversationId } }),
+        prisma.conversationMember.deleteMany({ where: { conversationId } }),
+        prisma.conversation.delete({ where: { id: conversationId } }),
+      ]);
+      await Promise.allSettled(attachmentKeys.map(({ storageKey }) => storage.deleteObject(storageKey)));
+      await redis.publishChatEvent({
+        recipientUserIds,
+        event: { type: "conversation_deleted", data: { conversationId } },
+      });
+      res.json({ success: true, conversationId });
+    } catch (error) {
+      console.error("Failed to delete conversation:", error);
+      res.status(500).json({ error: "Failed to delete conversation" });
+    }
+  };
+
+  router.delete("/:conversationId", deleteConversation);
+  router.post("/:conversationId/delete", deleteConversation);
 
   return router;
 };

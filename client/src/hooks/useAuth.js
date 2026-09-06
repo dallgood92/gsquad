@@ -25,6 +25,10 @@ function useAuth() {
     setUser(authenticatedUser);
   };
 
+  const updateUser = (updatedUser) => {
+    setUser(updatedUser);
+  };
+
   const logout = async () => {
   try {
     await logoutUser();
@@ -38,6 +42,7 @@ function useAuth() {
     user,
     loading,
     login,
+    updateUser,
     logout,
   };
 }

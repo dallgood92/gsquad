@@ -29,7 +29,18 @@ const messageInclude = {
   pins: {
     include: { pinnedBy: { select: { id: true, name: true } } },
   },
+  attachments: true,
 };
+
+async function withAttachmentUrls(message, storage) {
+  return {
+    ...message,
+    attachments: await Promise.all((message.attachments || []).map(async (attachment) => ({
+      ...attachment,
+      url: await storage.getDownloadUrl(attachment.storageKey),
+    }))),
+  };
+}
 
 async function getRecipientUserIds(
   prisma,
@@ -61,7 +72,8 @@ async function getRecipientUserIds(
 module.exports =
   function createMessageRoutes(
     prisma,
-    redis
+    redis,
+    storage
   ) {
     router.get(
       "/:conversationId/messages",
@@ -172,7 +184,7 @@ module.exports =
               : null;
 
           res.json({
-            messages,
+            messages: storage.configured ? await Promise.all(messages.map((message) => withAttachmentUrls(message, storage))) : messages,
             hasMore,
             nextCursor,
           });
@@ -231,7 +243,7 @@ module.exports =
               });
           }
 
-          const { text, replyToMessageId } =
+          const { text, replyToMessageId, attachment } =
             result.data;
 
           const membership =
@@ -255,6 +267,25 @@ module.exports =
               });
           }
 
+          const conversation = await prisma.conversation.findUnique({
+            where: { id: conversationId },
+            select: { type: true, members: { select: { userId: true } } },
+          });
+
+          if (conversation?.type === "DIRECT") {
+            const otherUserId = conversation.members.find((member) => member.userId !== req.userId)?.userId;
+            const friendship = otherUserId && await prisma.friendship.findFirst({
+              where: {
+                status: "ACCEPTED",
+                OR: [
+                  { userId: req.userId, friendId: otherUserId },
+                  { userId: otherUserId, friendId: req.userId },
+                ],
+              },
+            });
+            if (!friendship) return res.status(403).json({ error: "You can only message accepted friends" });
+          }
+
 
           if (replyToMessageId) {
             const replyTarget = await prisma.message.findFirst({
@@ -266,6 +297,13 @@ module.exports =
             }
           }
 
+          if (attachment) {
+            const expectedPrefix = `conversations/${conversationId}/${req.userId}/`;
+            if (!attachment.storageKey.startsWith(expectedPrefix)) return res.status(400).json({ error: "Invalid attachment upload" });
+            storage.validateFile(attachment);
+            await storage.verifyUpload(attachment);
+          }
+
           const newMessage =
             await prisma.message.create({
               data: {
@@ -274,11 +312,13 @@ module.exports =
                   req.userId,
                 conversationId,
                 replyToMessageId: replyToMessageId ?? null,
+                ...(attachment && { attachments: { create: attachment } }),
               },
 
               include: messageInclude,
             });
 
+          const messageForDelivery = attachment ? await withAttachmentUrls(newMessage, storage) : newMessage;
           const mentionableMembers = await prisma.conversationMember.findMany({
             where: { conversationId, userId: { not: req.userId } },
             include: { user: { select: { id: true, name: true } } },
@@ -317,14 +357,14 @@ module.exports =
 
               data: {
                 message:
-                  newMessage,
+                  messageForDelivery,
               },
             },
           });
 
           res
             .status(201)
-            .json(newMessage);
+            .json(messageForDelivery);
         } catch (error) {
           console.error(
             "Failed to create message:",
@@ -357,7 +397,9 @@ module.exports =
             include: { ...messageInclude, replies: { include: messageInclude, orderBy: { id: "asc" } } },
           });
           if (!message) return res.status(404).json({ error: "Message not found" });
-          res.json(message);
+          const root = storage.configured ? await withAttachmentUrls(message, storage) : message;
+          root.replies = storage.configured ? await Promise.all(message.replies.map((reply) => withAttachmentUrls(reply, storage))) : message.replies;
+          res.json(root);
         } catch (error) {
           console.error("Failed to get thread:", error);
           res.status(500).json({ error: "Failed to get thread" });
@@ -421,6 +463,7 @@ module.exports =
                 id: messageId,
                 conversationId,
               },
+              include: { attachments: true },
             });
 
           if (!message) {
@@ -453,6 +496,9 @@ module.exports =
               });
           }
 
+          await Promise.allSettled(message.attachments.map(({ storageKey }) => storage.deleteObject(storageKey)));
+          await prisma.messageAttachment.deleteMany({ where: { messageId } });
+
           const updatedMessage =
             await prisma.message.update({
               where: {
@@ -470,6 +516,7 @@ module.exports =
               include: messageInclude,
             });
 
+          const updatedForDelivery = storage.configured ? await withAttachmentUrls(updatedMessage, storage) : updatedMessage;
           const recipientUserIds =
             await getRecipientUserIds(
               prisma,
@@ -486,13 +533,13 @@ module.exports =
 
               data: {
                 message:
-                  updatedMessage,
+                  updatedForDelivery,
               },
             },
           });
 
           res.json(
-            updatedMessage
+            updatedForDelivery
           );
         } catch (error) {
           console.error(
@@ -580,9 +627,7 @@ module.exports =
                 include: messageInclude,
               });
 
-            return res.json(
-              existingMessage
-            );
+            return res.json(storage.configured ? await withAttachmentUrls(existingMessage, storage) : existingMessage);
           }
 
           const deletedMessage =
@@ -599,6 +644,7 @@ module.exports =
               include: messageInclude,
             });
 
+          const deletedForDelivery = storage.configured ? await withAttachmentUrls(deletedMessage, storage) : deletedMessage;
           const recipientUserIds =
             await getRecipientUserIds(
               prisma,
@@ -615,13 +661,13 @@ module.exports =
 
               data: {
                 message:
-                  deletedMessage,
+                  deletedForDelivery,
               },
             },
           });
 
           res.json(
-            deletedMessage
+            deletedForDelivery
           );
         } catch (error) {
           console.error(
@@ -667,12 +713,13 @@ module.exports =
           }
 
           const updatedMessage = await prisma.message.findUnique({ where: { id: messageId }, include: messageInclude });
+          const updatedForDelivery = storage.configured ? await withAttachmentUrls(updatedMessage, storage) : updatedMessage;
           const recipientUserIds = await getRecipientUserIds(prisma, conversationId, req.userId);
           await redis.publishChatEvent({
             recipientUserIds,
-            event: { type: "message_updated", data: { message: updatedMessage } },
+            event: { type: "message_updated", data: { message: updatedForDelivery } },
           });
-          res.json(updatedMessage);
+          res.json(updatedForDelivery);
         } catch (error) {
           console.error("Failed to toggle reaction:", error);
           res.status(500).json({ error: "Failed to toggle reaction" });
@@ -693,7 +740,7 @@ module.exports =
           include: { pinnedBy: { select: { id: true, name: true } }, message: { include: messageInclude } },
           orderBy: { createdAt: "desc" },
         });
-        res.json({ pins });
+        res.json({ pins: storage.configured ? await Promise.all(pins.map(async (pin) => ({ ...pin, message: await withAttachmentUrls(pin.message, storage) }))) : pins });
       } catch (error) {
         console.error("Failed to get pinned messages:", error);
         res.status(500).json({ error: "Failed to get pinned messages" });
@@ -714,9 +761,10 @@ module.exports =
         if (existing) await prisma.messagePin.delete({ where: { messageId } });
         else await prisma.messagePin.create({ data: { messageId, pinnedById: req.userId } });
         const updatedMessage = await prisma.message.findUnique({ where: { id: messageId }, include: messageInclude });
+        const updatedForDelivery = storage.configured ? await withAttachmentUrls(updatedMessage, storage) : updatedMessage;
         const recipientUserIds = await getRecipientUserIds(prisma, conversationId, req.userId);
-        await redis.publishChatEvent({ recipientUserIds, event: { type: "message_updated", data: { message: updatedMessage } } });
-        res.json(updatedMessage);
+        await redis.publishChatEvent({ recipientUserIds, event: { type: "message_updated", data: { message: updatedForDelivery } } });
+        res.json(updatedForDelivery);
       } catch (error) {
         console.error("Failed to toggle message pin:", error);
         res.status(500).json({ error: "Failed to update pin" });

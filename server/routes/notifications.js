@@ -31,5 +31,27 @@ module.exports = function createNotificationRoutes(prisma) {
     }
   });
 
+  router.delete("/:notificationId", async (req, res) => {
+    try {
+      const notificationId = Number(req.params.notificationId);
+      if (!Number.isInteger(notificationId)) return res.status(400).json({ error: "Invalid notification" });
+      await prisma.notification.deleteMany({ where: { id: notificationId, userId: req.userId } });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to dismiss notification:", error);
+      res.status(500).json({ error: "Failed to dismiss notification" });
+    }
+  });
+
+  router.delete("/", async (req, res) => {
+    try {
+      await prisma.notification.deleteMany({ where: { userId: req.userId } });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to clear notifications:", error);
+      res.status(500).json({ error: "Failed to clear notifications" });
+    }
+  });
+
   return router;
 };

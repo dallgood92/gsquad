@@ -37,6 +37,22 @@ export async function getCurrentUser() {
   return response.json();
 }
 
+export async function updateCurrentUser(name) {
+  const response = await fetch(`${API_URL}/users/me`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error || "Failed to update display name");
+  }
+
+  return response.json();
+}
+
 export async function loginWithGoogle(
   credential
 ) {
@@ -106,6 +122,75 @@ export async function searchUsers(
   return response.json();
 }
 
+export async function getFriends() {
+  const response = await fetch(`${API_URL}/friends`, { credentials: "include" });
+  if (!response.ok) throw new Error("Failed to load friends");
+  return response.json();
+}
+
+export async function getBlockedUsers() {
+  const response = await fetch(`${API_URL}/friends/blocked`, { credentials: "include" });
+  if (!response.ok) throw new Error("Failed to load blocked users");
+  return response.json();
+}
+
+export async function blockUser(userId) {
+  const response = await fetch(`${API_URL}/friends/${userId}/block`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error || "Failed to block user");
+  }
+  return response.json();
+}
+
+export async function unblockUser(userId) {
+  const response = await fetch(`${API_URL}/friends/${userId}/block`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!response.ok) throw new Error("Failed to unblock user");
+  return response.json();
+}
+
+export async function addFriend(friendId) {
+  const response = await fetch(`${API_URL}/friends/${friendId}`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) throw new Error("Failed to add friend");
+  return response.json();
+}
+
+export async function removeFriend(friendId) {
+  const response = await fetch(`${API_URL}/friends/${friendId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!response.ok) throw new Error("Failed to remove friend");
+  return response.json();
+}
+
+export async function getFriendRequests() {
+  const response = await fetch(`${API_URL}/friends/requests`, { credentials: "include" });
+  if (!response.ok) throw new Error("Failed to load friend requests");
+  return response.json();
+}
+
+export async function acceptFriendRequest(friendId) {
+  const response = await fetch(`${API_URL}/friends/${friendId}/accept`, {
+    method: "PATCH",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error || "Failed to accept friend request");
+  }
+  return response.json();
+}
+
 export async function getConversations() {
   const response = await fetch(
     `${API_URL}/conversations`,
@@ -157,7 +242,10 @@ export async function createDirectConversation(userId) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ userId }),
   });
-  if (!response.ok) throw new Error("Failed to start direct message");
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error || "Failed to start direct message");
+  }
   return response.json();
 }
 
@@ -197,11 +285,26 @@ export async function renameConversation(conversationId, name) {
   return response.json();
 }
 
+export async function deleteConversation(conversationId) {
+  const response = await fetch(`${API_URL}/conversations/${conversationId}/delete`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error || "Failed to delete conversation");
+  }
+  return response.json();
+}
+
 export async function removeConversationMember(conversationId, userId) {
   const response = await fetch(`${API_URL}/conversations/${conversationId}/members/${userId}`, {
     method: "DELETE", credentials: "include",
   });
-  if (!response.ok) throw new Error("Failed to remove conversation member");
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error || "Failed to leave group");
+  }
   return response.json();
 }
 
@@ -295,12 +398,44 @@ export async function sendMessage(
   );
 
   if (!response.ok) {
-    throw new Error(
-      "Failed to send message"
-    );
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error || "Message could not be sent");
   }
 
   return response.json();
+}
+
+export async function uploadMessageAttachment(conversationId, file, metadata = {}, onProgress) {
+  const response = await fetch(`${API_URL}/attachments/presign`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ conversationId, originalName: file.name, mimeType: file.type, size: file.size }),
+  });
+  const upload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(upload?.error || "Attachment upload is unavailable");
+
+  await new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("PUT", upload.uploadUrl);
+    request.setRequestHeader("Content-Type", file.type);
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress?.(Math.round((event.loaded / event.total) * 100));
+    };
+    request.onload = () => request.status >= 200 && request.status < 300 ? resolve() : reject(new Error("The attachment could not be uploaded"));
+    request.onerror = () => reject(new Error("The attachment could not be uploaded"));
+    request.send(file);
+  });
+
+  return {
+    storageKey: upload.storageKey,
+    originalName: file.name,
+    mimeType: file.type,
+    size: file.size,
+    width: metadata.width ?? null,
+    height: metadata.height ?? null,
+    duration: metadata.duration ?? null,
+  };
 }
 
 export async function updateMessage(
@@ -345,9 +480,8 @@ export async function deleteMessage(
   );
 
   if (!response.ok) {
-    throw new Error(
-      "Failed to delete message"
-    );
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error || "Failed to delete message");
   }
 
   return response.json();
@@ -417,6 +551,18 @@ export async function getNotifications() {
 export async function markNotificationsRead() {
   const response = await fetch(`${API_URL}/notifications/read`, { method: "PATCH", credentials: "include" });
   if (!response.ok) throw new Error("Failed to mark notifications read");
+  return response.json();
+}
+
+export async function dismissNotification(notificationId) {
+  const response = await fetch(`${API_URL}/notifications/${notificationId}`, { method: "DELETE", credentials: "include" });
+  if (!response.ok) throw new Error("Failed to dismiss notification");
+  return response.json();
+}
+
+export async function clearNotifications() {
+  const response = await fetch(`${API_URL}/notifications`, { method: "DELETE", credentials: "include" });
+  if (!response.ok) throw new Error("Failed to clear notifications");
   return response.json();
 }
 

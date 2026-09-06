@@ -1,5 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { searchMessages } from "../services/api";
+import useClickOutside from "../hooks/useClickOutside";
+import Avatar from "./Avatar";
+
+function formatSearchTime(createdAt) {
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(createdAt));
+}
 
 function MessageSearch({ onSelectResult }) {
   const [query, setQuery] = useState("");
@@ -7,6 +13,7 @@ function MessageSearch({ onSelectResult }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const requestIdRef = useRef(0);
+  const rootRef = useRef(null);
 
   useEffect(() => {
     const trimmedQuery = query.trim();
@@ -35,9 +42,15 @@ function MessageSearch({ onSelectResult }) {
     setResults([]);
     setError(null);
   };
+  const dismiss = useCallback(() => {
+    setQuery("");
+    setResults([]);
+    setError(null);
+  }, []);
+  useClickOutside(rootRef, dismiss, query.trim().length >= 2);
 
   return (
-    <div className="message-search">
+    <div className="message-search" ref={rootRef}>
       <input
         type="search"
         value={query}
@@ -47,7 +60,7 @@ function MessageSearch({ onSelectResult }) {
       />
       {query.trim().length >= 2 && (
         <div className="search-results">
-          <div className="search-results-header"><strong>Search results</strong><button type="button" onClick={close}>×</button></div>
+          <div className="search-results-header"><span><strong>Messages</strong><small>{!loading && !error ? `${results.length} ${results.length === 1 ? "result" : "results"}` : "Search results"}</small></span></div>
           {loading && <p>Searching...</p>}
           {error && <p>{error}</p>}
           {!loading && !error && results.length === 0 && <p>No messages found.</p>}
@@ -58,8 +71,8 @@ function MessageSearch({ onSelectResult }) {
               key={message.id}
               onClick={() => { onSelectResult(message); close(); }}
             >
-              <span><strong>{message.conversation.name}</strong> · {message.sender.name}</span>
-              <span>{message.text}</span>
+              <Avatar user={message.sender} size="small" />
+              <span className="search-result-copy"><span><strong>{message.sender.name}</strong><small>{message.conversation.name} · {formatSearchTime(message.createdAt)}</small></span><span>{message.text}</span></span>
             </button>
           ))}
         </div>

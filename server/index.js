@@ -22,10 +22,14 @@ const createMemberRoutes =
 
 const createUserRoutes =
   require("./routes/users");
+const createFriendRoutes =
+  require("./routes/friends");
 const createSearchRoutes =
   require("./routes/search");
 const createNotificationRoutes =
   require("./routes/notifications");
+const createAttachmentRoutes = require("./routes/attachments");
+const { createStorage } = require("./storage");
 
 const requireAuth =
   require("./middleware/auth");
@@ -38,6 +42,7 @@ const createRedis =
 
 const app = express();
 const prisma = new PrismaClient();
+const storage = createStorage();
 
 const PORT = 3001;
 
@@ -95,6 +100,12 @@ async function startServer() {
         redis
       );
 
+    app.use(
+      "/friends",
+      requireAuth,
+      createFriendRoutes(prisma, redis)
+    );
+
     await redis.subscribeToChatEvents(
       (redisEvent) => {
         const {
@@ -134,7 +145,7 @@ async function startServer() {
     app.use(
       "/conversations",
       requireAuth,
-      createConversationRoutes(prisma, redis)
+      createConversationRoutes(prisma, redis, storage)
     );
 
     app.use(
@@ -151,9 +162,12 @@ async function startServer() {
       requireAuth,
       createMessageRoutes(
         prisma,
-        redis
+        redis,
+        storage
       )
     );
+
+    app.use("/attachments", requireAuth, createAttachmentRoutes(prisma, storage));
 
     server.listen(PORT, () => {
       console.log(
