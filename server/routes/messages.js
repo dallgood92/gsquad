@@ -314,6 +314,32 @@ module.exports =
       }
     );
 
+    router.get(
+      "/:conversationId/messages/:messageId/thread",
+      async (req, res) => {
+        try {
+          const conversationId = Number(req.params.conversationId);
+          const messageId = Number(req.params.messageId);
+          if (!Number.isInteger(conversationId) || !Number.isInteger(messageId)) {
+            return res.status(400).json({ error: "Invalid conversation or message ID" });
+          }
+          const membership = await prisma.conversationMember.findUnique({
+            where: { userId_conversationId: { userId: req.userId, conversationId } },
+          });
+          if (!membership) return res.status(403).json({ error: "You are not a member of this conversation" });
+          const message = await prisma.message.findFirst({
+            where: { id: messageId, conversationId },
+            include: { ...messageInclude, replies: { include: messageInclude, orderBy: { id: "asc" } } },
+          });
+          if (!message) return res.status(404).json({ error: "Message not found" });
+          res.json(message);
+        } catch (error) {
+          console.error("Failed to get thread:", error);
+          res.status(500).json({ error: "Failed to get thread" });
+        }
+      }
+    );
+
     router.patch(
       "/:conversationId/messages/:messageId",
       async (req, res) => {

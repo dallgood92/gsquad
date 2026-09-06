@@ -1161,6 +1161,8 @@ function useConversations(
         receiveMessage(
           newMessage
         );
+
+        return newMessage;
       } catch (error) {
         console.error(
           "Failed to send message:",

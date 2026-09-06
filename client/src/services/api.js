@@ -315,6 +315,15 @@ export async function toggleMessageReaction(
   return response.json();
 }
 
+export async function getMessageThread(conversationId, messageId) {
+  const response = await fetch(
+    `${API_URL}/conversations/${conversationId}/messages/${messageId}/thread`,
+    { credentials: "include" }
+  );
+  if (!response.ok) throw new Error("Failed to load thread");
+  return response.json();
+}
+
 export async function markConversationRead(
   conversationId,
   messageId

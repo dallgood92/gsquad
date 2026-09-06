@@ -384,7 +384,7 @@ function MessageList({
           </p>
         )}
 
-        {messages.map(
+        {messages.filter((message) => !message.replyToMessageId).map(
           (message) => {
             const isOwnMessage =
               message.senderId ===
@@ -590,7 +590,11 @@ function MessageList({
                     </div>
                   )}
                 {!isDeleted && !isEditing && (
-                  <button type="button" className="reply-button" onClick={() => onReply(message)}>Reply</button>
+                  <button type="button" className="reply-button" onClick={() => onReply(message)}>
+                    {messages.filter((candidate) => candidate.replyToMessageId === message.id).length
+                      ? `View thread (${messages.filter((candidate) => candidate.replyToMessageId === message.id).length})`
+                      : "Reply"}
+                  </button>
                 )}
               </div>
             );

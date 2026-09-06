@@ -8,6 +8,7 @@ import AddMember from "./components/AddMember";
 import ConversationList from "./components/ConversationList";
 import MessageList from "./components/MessageList";
 import MessageInput from "./components/MessageInput";
+import ThreadPanel from "./components/ThreadPanel";
 import LoginPage from "./pages/LoginPage";
 
 import useAuth from "./hooks/useAuth";
@@ -62,10 +63,10 @@ function App() {
     user?.id
   );
 
-  const [replyToMessage, setReplyToMessage] = useState(null);
+  const [threadMessage, setThreadMessage] = useState(null);
 
   const handleSelectConversation = (conversationId) => {
-    setReplyToMessage(null);
+    setThreadMessage(null);
     selectConversation(conversationId);
   };
 
@@ -443,7 +444,7 @@ function App() {
                   deleteMessage
                 }
                 onToggleReaction={toggleMessageReaction}
-                onReply={setReplyToMessage}
+                onReply={setThreadMessage}
               />
             )}
 
@@ -467,8 +468,6 @@ function App() {
               onSendMessage={
                 sendMessage
               }
-              replyToMessage={replyToMessage}
-              onCancelReply={() => setReplyToMessage(null)}
               onTypingStart={
                 handleTypingStart
               }
@@ -476,6 +475,15 @@ function App() {
                 handleTypingStop
               }
             />
+            {threadMessage && (
+              <ThreadPanel
+                conversationId={selectedConversation.id}
+                rootMessage={threadMessage}
+                liveMessages={selectedConversation.messages}
+                onClose={() => setThreadMessage(null)}
+                onSendMessage={sendMessage}
+              />
+            )}
           </>
         ) : (
           <div className="empty-chat">
