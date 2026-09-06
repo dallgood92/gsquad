@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -59,6 +60,14 @@ function useConversations() {
 
   const [error, setError] =
     useState(null);
+
+  const conversationsRef =
+    useRef([]);
+
+  useEffect(() => {
+    conversationsRef.current =
+      conversations;
+  }, [conversations]);
 
   useEffect(() => {
     async function loadConversations() {
@@ -122,7 +131,7 @@ function useConversations() {
     }
 
     const conversation =
-      conversations.find(
+      conversationsRef.current.find(
         (conversation) =>
           conversation.id ===
           selectedConversationId
@@ -193,10 +202,7 @@ function useConversations() {
     }
 
     loadMessages();
-  }, [
-    selectedConversationId,
-    conversations,
-  ]);
+  }, [selectedConversationId]);
 
   const selectConversation = (
     conversationId
