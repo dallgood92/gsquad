@@ -51,6 +51,7 @@ function App() {
     receiveMessage,
     receiveMessageUpdate,
     receiveMessageDelete,
+    receiveReadReceipt,
     editMessage,
     deleteMessage,
     toggleMessageReaction,
@@ -141,6 +142,10 @@ function App() {
             setNotificationsRevision((revision) => revision + 1);
             break;
 
+          case "conversation_read":
+            receiveReadReceipt(event.data);
+            break;
+
           case "conversation_added":
             receiveConversation(
               event.data
@@ -188,6 +193,7 @@ function App() {
         receiveMessage,
         receiveMessageUpdate,
         receiveMessageDelete,
+        receiveReadReceipt,
         setInitialPresence,
         setUserOffline,
         setUserOnline,
@@ -502,6 +508,7 @@ function App() {
                 currentUser={
                   user
                 }
+                members={selectedConversation.members}
                 hasMoreMessages={
                   selectedConversation.hasMoreMessages
                 }

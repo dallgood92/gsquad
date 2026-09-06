@@ -80,12 +80,6 @@ app.use(
   createNotificationRoutes(prisma)
 );
 
-app.use(
-  "/conversations",
-  requireAuth,
-  createConversationRoutes(prisma)
-);
-
 async function startServer() {
   try {
     const redis =
@@ -135,6 +129,12 @@ async function startServer() {
           event
         );
       }
+    );
+
+    app.use(
+      "/conversations",
+      requireAuth,
+      createConversationRoutes(prisma, redis)
     );
 
     app.use(

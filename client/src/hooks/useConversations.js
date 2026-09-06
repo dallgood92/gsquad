@@ -880,6 +880,23 @@ function useConversations(
       []
     );
 
+  const receiveReadReceipt = useCallback(({ conversationId, userId, messageId }) => {
+    setConversations((currentConversations) =>
+      currentConversations.map((conversation) =>
+        conversation.id !== conversationId
+          ? conversation
+          : {
+              ...conversation,
+              members: conversation.members.map((membership) =>
+                membership.userId === userId
+                  ? { ...membership, lastReadMessageId: messageId }
+                  : membership
+              ),
+            }
+      )
+    );
+  }, []);
+
   const editMessage =
     async (
       messageId,
@@ -1282,6 +1299,7 @@ function useConversations(
     receiveMessage,
     receiveMessageUpdate,
     receiveMessageDelete,
+    receiveReadReceipt,
 
     editMessage,
     deleteMessage,

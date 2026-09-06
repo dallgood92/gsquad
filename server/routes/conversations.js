@@ -7,7 +7,8 @@ const {
 const router = express.Router();
 
 module.exports = function createConversationRoutes(
-  prisma
+  prisma,
+  redis
 ) {
   router.get("/", async (req, res) => {
     try {
@@ -272,7 +273,7 @@ module.exports = function createConversationRoutes(
           });
         }
 
-        await prisma.conversationMember.updateMany({
+        const updateResult = await prisma.conversationMember.updateMany({
           where: {
             userId:
               req.userId,
@@ -308,6 +309,21 @@ module.exports = function createConversationRoutes(
               },
             },
           });
+
+        if (updateResult.count > 0) {
+          const recipients = await prisma.conversationMember.findMany({
+            where: { conversationId, userId: { not: req.userId } },
+            select: { userId: true },
+          });
+
+          await redis.publishChatEvent({
+            recipientUserIds: recipients.map((member) => member.userId),
+            event: {
+              type: "conversation_read",
+              data: { conversationId, userId: req.userId, messageId: updatedMembership.lastReadMessageId },
+            },
+          });
+        }
 
         res.json(
           updatedMembership

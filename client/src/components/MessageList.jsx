@@ -30,6 +30,7 @@ function formatMessageTime(
 function MessageList({
   messages,
   currentUser,
+  members,
   hasMoreMessages,
   onLoadOlderMessages,
   olderMessagesLoading,
@@ -416,6 +417,12 @@ function MessageList({
                 return groups;
               }, {})
             );
+            const readers = isOwnMessage
+              ? members.filter((membership) =>
+                  membership.userId !== currentUser.id &&
+                  (membership.lastReadMessageId ?? 0) >= message.id
+                )
+              : [];
 
             return (
               <div
@@ -541,6 +548,11 @@ function MessageList({
                   {message.deliveryStatus && (
                     <span className={`message-delivery ${message.deliveryStatus}`}>
                       {message.deliveryStatus === "sending" ? "Sending…" : "Failed"}
+                    </span>
+                  )}
+                  {!message.isOptimistic && readers.length > 0 && (
+                    <span className="message-seen" title={readers.map((membership) => membership.user.name).join(", ")}>
+                      Seen{readers.length > 1 ? ` by ${readers.length}` : ""}
                     </span>
                   )}
                 </div>
