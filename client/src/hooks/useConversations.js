@@ -14,6 +14,7 @@ import {
   sendMessage as sendMessageRequest,
   updateMessage as updateMessageRequest,
   toggleMessageReaction as toggleMessageReactionRequest,
+  toggleMessagePin as toggleMessagePinRequest,
 } from "../services/api";
 
 function mergeMessages(
@@ -972,6 +973,20 @@ function useConversations(
     }
   };
 
+  const toggleMessagePin = async (messageId) => {
+    if (!selectedConversationId) return false;
+    try {
+      setError(null);
+      const updatedMessage = await toggleMessagePinRequest(selectedConversationId, messageId);
+      receiveMessageUpdate(updatedMessage);
+      return true;
+    } catch (error) {
+      console.error("Failed to update pin:", error);
+      setError(error.message);
+      return false;
+    }
+  };
+
   const loadOlderMessages =
     async () => {
       if (!selectedConversation) {
@@ -1191,6 +1206,7 @@ function useConversations(
     editMessage,
     deleteMessage,
     toggleMessageReaction,
+    toggleMessagePin,
 
     loadOlderMessages,
 

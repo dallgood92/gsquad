@@ -15,6 +15,7 @@ model User {
   avatarUrl   String?
   messages    Message[]
   reactions   MessageReaction[]
+  messagePins MessagePin[]
   memberships ConversationMember[]
   createdAt   DateTime             @default(now())
 }
@@ -54,6 +55,7 @@ model Message {
   replyToMessage   Message?          @relation("MessageReplies", fields: [replyToMessageId], references: [id])
   replies          Message[]         @relation("MessageReplies")
   reactions        MessageReaction[]
+  pins             MessagePin[]
 
   createdAt DateTime  @default(now())
   editedAt  DateTime?
@@ -74,4 +76,15 @@ model MessageReaction {
 
   @@unique([messageId, userId, emoji])
   @@index([messageId])
+}
+
+model MessagePin {
+  id         Int      @id @default(autoincrement())
+  messageId  Int      @unique
+  pinnedById Int
+  message    Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  pinnedBy   User     @relation(fields: [pinnedById], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([pinnedById])
 }

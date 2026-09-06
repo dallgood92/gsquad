@@ -333,6 +333,21 @@ export async function searchMessages(query) {
   return response.json();
 }
 
+export async function getPinnedMessages(conversationId) {
+  const response = await fetch(`${API_URL}/conversations/${conversationId}/pins`, { credentials: "include" });
+  if (!response.ok) throw new Error("Failed to load pinned messages");
+  return response.json();
+}
+
+export async function toggleMessagePin(conversationId, messageId) {
+  const response = await fetch(`${API_URL}/conversations/${conversationId}/messages/${messageId}/pin`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) throw new Error("Failed to update pin");
+  return response.json();
+}
+
 export async function markConversationRead(
   conversationId,
   messageId

@@ -26,6 +26,9 @@ const messageInclude = {
     include: { user: { select: { id: true, name: true } } },
     orderBy: { id: "asc" },
   },
+  pins: {
+    include: { pinnedBy: { select: { id: true, name: true } } },
+  },
 };
 
 async function getRecipientUserIds(
@@ -654,6 +657,49 @@ module.exports =
         }
       }
     );
+
+    router.get("/:conversationId/pins", async (req, res) => {
+      try {
+        const conversationId = Number(req.params.conversationId);
+        if (!Number.isInteger(conversationId)) return res.status(400).json({ error: "Invalid conversation ID" });
+        const membership = await prisma.conversationMember.findUnique({
+          where: { userId_conversationId: { userId: req.userId, conversationId } },
+        });
+        if (!membership) return res.status(403).json({ error: "You are not a member of this conversation" });
+        const pins = await prisma.messagePin.findMany({
+          where: { message: { conversationId, deletedAt: null } },
+          include: { pinnedBy: { select: { id: true, name: true } }, message: { include: messageInclude } },
+          orderBy: { createdAt: "desc" },
+        });
+        res.json({ pins });
+      } catch (error) {
+        console.error("Failed to get pinned messages:", error);
+        res.status(500).json({ error: "Failed to get pinned messages" });
+      }
+    });
+
+    router.post("/:conversationId/messages/:messageId/pin", async (req, res) => {
+      try {
+        const conversationId = Number(req.params.conversationId);
+        const messageId = Number(req.params.messageId);
+        const membership = await prisma.conversationMember.findUnique({
+          where: { userId_conversationId: { userId: req.userId, conversationId } },
+        });
+        const message = await prisma.message.findFirst({ where: { id: messageId, conversationId } });
+        if (!membership) return res.status(403).json({ error: "You are not a member of this conversation" });
+        if (!message || message.deletedAt) return res.status(404).json({ error: "Message not found" });
+        const existing = await prisma.messagePin.findUnique({ where: { messageId } });
+        if (existing) await prisma.messagePin.delete({ where: { messageId } });
+        else await prisma.messagePin.create({ data: { messageId, pinnedById: req.userId } });
+        const updatedMessage = await prisma.message.findUnique({ where: { id: messageId }, include: messageInclude });
+        const recipientUserIds = await getRecipientUserIds(prisma, conversationId, req.userId);
+        await redis.publishChatEvent({ recipientUserIds, event: { type: "message_updated", data: { message: updatedMessage } } });
+        res.json(updatedMessage);
+      } catch (error) {
+        console.error("Failed to toggle message pin:", error);
+        res.status(500).json({ error: "Failed to update pin" });
+      }
+    });
 
     return router;
   };

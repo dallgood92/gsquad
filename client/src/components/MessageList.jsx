@@ -37,6 +37,7 @@ function MessageList({
   onDeleteMessage,
   onToggleReaction,
   onReply,
+  onTogglePin,
 }) {
   const listRef =
     useRef(null);
@@ -594,6 +595,11 @@ function MessageList({
                     {messages.filter((candidate) => candidate.replyToMessageId === message.id).length
                       ? `View thread (${messages.filter((candidate) => candidate.replyToMessageId === message.id).length})`
                       : "Reply"}
+                  </button>
+                )}
+                {!isDeleted && !isEditing && (
+                  <button type="button" className="pin-button" onClick={() => onTogglePin(message.id)}>
+                    {message.pins?.length ? "Unpin" : "Pin"}
                   </button>
                 )}
               </div>

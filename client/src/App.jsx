@@ -10,6 +10,7 @@ import MessageList from "./components/MessageList";
 import MessageSearch from "./components/MessageSearch";
 import MessageInput from "./components/MessageInput";
 import ThreadPanel from "./components/ThreadPanel";
+import PinnedMessages from "./components/PinnedMessages";
 import LoginPage from "./pages/LoginPage";
 
 import useAuth from "./hooks/useAuth";
@@ -49,6 +50,7 @@ function App() {
     editMessage,
     deleteMessage,
     toggleMessageReaction,
+    toggleMessagePin,
     loadOlderMessages,
     startTyping,
     stopTyping,
@@ -65,15 +67,23 @@ function App() {
   );
 
   const [threadMessage, setThreadMessage] = useState(null);
+  const [showPinnedMessages, setShowPinnedMessages] = useState(false);
+  const [pinsRevision, setPinsRevision] = useState(0);
 
   const handleSelectConversation = (conversationId) => {
     setThreadMessage(null);
+    setShowPinnedMessages(false);
     selectConversation(conversationId);
   };
 
   const handleSearchResult = (message) => {
     handleSelectConversation(message.conversationId);
     if (message.replyToMessage) setThreadMessage(message.replyToMessage);
+  };
+
+  const handleTogglePin = async (messageId) => {
+    const updated = await toggleMessagePin(messageId);
+    if (updated) setPinsRevision((revision) => revision + 1);
   };
 
   const {
@@ -417,6 +427,9 @@ function App() {
                   addMemberToConversation
                 }
               />
+              <button type="button" onClick={() => setShowPinnedMessages(true)}>
+                Pinned messages
+              </button>
             </div>
 
             {error && (
@@ -452,6 +465,7 @@ function App() {
                 }
                 onToggleReaction={toggleMessageReaction}
                 onReply={setThreadMessage}
+                onTogglePin={handleTogglePin}
               />
             )}
 
@@ -489,6 +503,17 @@ function App() {
                 liveMessages={selectedConversation.messages}
                 onClose={() => setThreadMessage(null)}
                 onSendMessage={sendMessage}
+              />
+            )}
+            {showPinnedMessages && (
+              <PinnedMessages
+                conversationId={selectedConversation.id}
+                revision={pinsRevision}
+                onClose={() => setShowPinnedMessages(false)}
+                onSelect={(message) => {
+                  setShowPinnedMessages(false);
+                  if (message.replyToMessage) setThreadMessage(message.replyToMessage);
+                }}
               />
             )}
           </>
