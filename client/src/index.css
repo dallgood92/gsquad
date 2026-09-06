@@ -189,6 +189,11 @@ Message List
   font-style: italic;
 }
 
+.message-delivery { font-size: 12px; }
+.message-delivery.sending { color: #666; }
+.message-delivery.failed { color: #b91c1c; font-weight: 600; }
+.retry-message { align-self: flex-end; border: 1px solid #b91c1c; border-radius: 4px; background: white; color: #b91c1c; cursor: pointer; padding: 4px 8px; }
+
 .message-own {
   align-self: flex-end;
   background: #dbeafe;

@@ -17,6 +17,8 @@ import {
   toggleMessagePin as toggleMessagePinRequest,
 } from "../services/api";
 
+let nextOptimisticMessageId = Date.now();
+
 function mergeMessages(
   ...messageGroups
 ) {
@@ -1162,19 +1164,65 @@ function useConversations(
         return;
       }
 
+      const conversationId = selectedConversationId;
+      const sender = selectedConversation?.members.find(
+        (membership) => membership.userId === currentUserId
+      )?.user;
+      const optimisticId = nextOptimisticMessageId++;
+      const optimisticMessage = {
+        id: optimisticId,
+        text: text.trim(),
+        senderId: currentUserId,
+        sender: sender ?? { id: currentUserId, name: "You" },
+        conversationId,
+        replyToMessageId,
+        replyToMessage: replyToMessageId
+          ? selectedConversation.messages.find((message) => message.id === replyToMessageId) ?? null
+          : null,
+        reactions: [],
+        pins: [],
+        createdAt: new Date().toISOString(),
+        editedAt: null,
+        deletedAt: null,
+        deliveryStatus: "sending",
+        isOptimistic: true,
+      };
+
+      setConversations((currentConversations) =>
+        currentConversations.map((conversation) =>
+          conversation.id === conversationId
+            ? {
+                ...conversation,
+                messages: mergeMessages(conversation.messages, [optimisticMessage]),
+                lastMessage: optimisticMessage,
+              }
+            : conversation
+        )
+      );
+
       try {
         setError(null);
 
         const newMessage =
           await sendMessageRequest(
-            selectedConversationId,
+            conversationId,
             replyToMessageId
               ? { text, replyToMessageId }
               : { text }
           );
 
-        receiveMessage(
-          newMessage
+        setConversations((currentConversations) =>
+          sortConversations(currentConversations.map((conversation) => {
+            if (conversation.id !== conversationId) return conversation;
+            return {
+              ...conversation,
+              messages: mergeMessages(
+                conversation.messages.filter((message) => message.id !== optimisticId),
+                [newMessage]
+              ),
+              lastMessage: conversation.lastMessage?.id === optimisticId ? newMessage : conversation.lastMessage,
+            };
+          }))
         );
 
         return newMessage;
@@ -1185,8 +1233,40 @@ function useConversations(
         );
 
         setError(error.message);
+
+        setConversations((currentConversations) =>
+          currentConversations.map((conversation) =>
+            conversation.id === conversationId
+              ? replaceMessageInConversation(conversation, {
+                  ...optimisticMessage,
+                  deliveryStatus: "failed",
+                })
+              : conversation
+          )
+        );
       }
     };
+
+  const retryMessage = async (messageId) => {
+    const failedMessage = selectedConversation?.messages.find(
+      (message) => message.id === messageId && message.deliveryStatus === "failed"
+    );
+    if (!failedMessage) return false;
+    setConversations((currentConversations) =>
+      currentConversations.map((conversation) => {
+        if (conversation.id !== selectedConversationId) return conversation;
+        const messages = conversation.messages.filter((message) => message.id !== messageId);
+        return {
+          ...conversation,
+          messages,
+          lastMessage: conversation.lastMessage?.id === messageId
+            ? messages[messages.length - 1] ?? null
+            : conversation.lastMessage,
+        };
+      })
+    );
+    return sendMessage(failedMessage.text, failedMessage.replyToMessageId);
+  };
 
   return {
     conversations,
@@ -1214,6 +1294,7 @@ function useConversations(
     stopTyping,
 
     sendMessage,
+    retryMessage,
 
     resync,
 

@@ -59,6 +59,7 @@ function App() {
     startTyping,
     stopTyping,
     sendMessage,
+    retryMessage,
     resync,
     loading:
       conversationsLoading,
@@ -519,6 +520,7 @@ function App() {
                 onToggleReaction={toggleMessageReaction}
                 onReply={setThreadMessage}
                 onTogglePin={handleTogglePin}
+                onRetryMessage={retryMessage}
               />
             )}
 

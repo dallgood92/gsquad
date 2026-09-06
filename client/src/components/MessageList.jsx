@@ -38,6 +38,7 @@ function MessageList({
   onToggleReaction,
   onReply,
   onTogglePin,
+  onRetryMessage,
 }) {
   const listRef =
     useRef(null);
@@ -537,7 +538,16 @@ function MessageList({
                         (edited)
                       </span>
                     )}
+                  {message.deliveryStatus && (
+                    <span className={`message-delivery ${message.deliveryStatus}`}>
+                      {message.deliveryStatus === "sending" ? "Sending…" : "Failed"}
+                    </span>
+                  )}
                 </div>
+
+                {message.deliveryStatus === "failed" && (
+                  <button type="button" className="retry-message" onClick={() => onRetryMessage(message.id)}>Retry</button>
+                )}
 
                 {!isDeleted && (
                   <div className="message-reactions">
@@ -558,7 +568,7 @@ function MessageList({
                   </div>
                 )}
 
-                {isOwnMessage &&
+                {isOwnMessage && !message.isOptimistic &&
                   !isDeleted &&
                   !isEditing && (
                     <div className="message-actions">
@@ -590,14 +600,14 @@ function MessageList({
                       </button>
                     </div>
                   )}
-                {!isDeleted && !isEditing && (
+                {!isDeleted && !isEditing && !message.isOptimistic && (
                   <button type="button" className="reply-button" onClick={() => onReply(message)}>
                     {messages.filter((candidate) => candidate.replyToMessageId === message.id).length
                       ? `View thread (${messages.filter((candidate) => candidate.replyToMessageId === message.id).length})`
                       : "Reply"}
                   </button>
                 )}
-                {!isDeleted && !isEditing && (
+                {!isDeleted && !isEditing && !message.isOptimistic && (
                   <button type="button" className="pin-button" onClick={() => onTogglePin(message.id)}>
                     {message.pins?.length ? "Unpin" : "Pin"}
                   </button>
