@@ -324,6 +324,15 @@ export async function getMessageThread(conversationId, messageId) {
   return response.json();
 }
 
+export async function searchMessages(query) {
+  const params = new URLSearchParams({ q: query });
+  const response = await fetch(`${API_URL}/search/messages?${params}`, {
+    credentials: "include",
+  });
+  if (!response.ok) throw new Error("Failed to search messages");
+  return response.json();
+}
+
 export async function markConversationRead(
   conversationId,
   messageId

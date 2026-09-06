@@ -7,6 +7,7 @@ import {
 import AddMember from "./components/AddMember";
 import ConversationList from "./components/ConversationList";
 import MessageList from "./components/MessageList";
+import MessageSearch from "./components/MessageSearch";
 import MessageInput from "./components/MessageInput";
 import ThreadPanel from "./components/ThreadPanel";
 import LoginPage from "./pages/LoginPage";
@@ -68,6 +69,11 @@ function App() {
   const handleSelectConversation = (conversationId) => {
     setThreadMessage(null);
     selectConversation(conversationId);
+  };
+
+  const handleSearchResult = (message) => {
+    handleSelectConversation(message.conversationId);
+    if (message.replyToMessage) setThreadMessage(message.replyToMessage);
   };
 
   const {
@@ -323,6 +329,7 @@ function App() {
       />
 
       <main className="chat">
+        <MessageSearch onSelectResult={handleSearchResult} />
         <div>
           <p>
             Server:{" "}
