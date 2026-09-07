@@ -94,6 +94,7 @@ function MessageList({
   const [confirmDeleteMessageId, setConfirmDeleteMessageId] = useState(null);
   const [deleteError, setDeleteError] = useState("");
   const [highlightedMessageId, setHighlightedMessageId] = useState(null);
+  const [previewAttachment, setPreviewAttachment] = useState(null);
 
   const jumpToMessage = (messageId) => {
     const target = listRef.current?.querySelector(
@@ -401,6 +402,23 @@ function MessageList({
   );
 
   useEffect(() => {
+    if (!previewAttachment) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setPreviewAttachment(null);
+    };
+
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [previewAttachment]);
+
+  useEffect(() => {
     if (!editingMessageId) {
       return;
     }
@@ -606,12 +624,20 @@ function MessageList({
                   </span>
                 ) : null}
 
-                {!isDeleted && message.attachments?.map((attachment) => attachment.mimeType.startsWith("video/") ? (
-                  <video className="message-attachment message-video" key={attachment.id ?? attachment.storageKey} src={attachment.url} controls playsInline preload="metadata" />
-                ) : (
-                  <a className="message-attachment-link" key={attachment.id ?? attachment.storageKey} href={attachment.url} target="_blank" rel="noreferrer">
-                    <img className="message-attachment message-image" src={attachment.url} alt={attachment.originalName} loading="lazy" />
-                  </a>
+                {!isDeleted && message.attachments?.map((attachment) => (
+                  <button
+                    type="button"
+                    className="message-attachment-link"
+                    key={attachment.id ?? attachment.storageKey}
+                    onClick={() => setPreviewAttachment(attachment)}
+                    aria-label={`Enlarge ${attachment.originalName}`}
+                  >
+                    {attachment.mimeType.startsWith("video/") ? (
+                      <video className="message-attachment message-video" src={attachment.url} muted playsInline preload="metadata" />
+                    ) : (
+                      <img className="message-attachment message-image" src={attachment.url} alt={attachment.originalName} loading="lazy" />
+                    )}
+                  </button>
                 ))}
 
                 {message.deliveryStatus === "failed" && (
@@ -677,6 +703,33 @@ function MessageList({
         >
           New messages ↓
         </button>
+      )}
+
+      {previewAttachment && (
+        <div
+          className="attachment-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label={previewAttachment.originalName}
+          onClick={() => setPreviewAttachment(null)}
+        >
+          <button
+            type="button"
+            className="attachment-lightbox-close"
+            onClick={() => setPreviewAttachment(null)}
+            aria-label="Close attachment preview"
+          >
+            ×
+          </button>
+          <div className="attachment-lightbox-content" onClick={(event) => event.stopPropagation()}>
+            {previewAttachment.mimeType.startsWith("video/") ? (
+              <video src={previewAttachment.url} controls autoPlay playsInline />
+            ) : (
+              <img src={previewAttachment.url} alt={previewAttachment.originalName} />
+            )}
+            <span>{previewAttachment.originalName}</span>
+          </div>
+        </div>
       )}
     </div>
   );

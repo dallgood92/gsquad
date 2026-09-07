@@ -5,6 +5,8 @@ const {
   WebSocket,
 } = require("ws");
 
+const HEARTBEAT_INTERVAL_MS = 30000;
+
 function parseCookies(cookieHeader = "") {
   return Object.fromEntries(
     cookieHeader
@@ -40,6 +42,21 @@ function createWebSocketServer(
   const wss = new WebSocketServer({
     server,
   });
+
+  const heartbeatInterval = setInterval(() => {
+    for (const client of wss.clients) {
+      if (client.isAlive === false) {
+        client.terminate();
+        continue;
+      }
+
+      client.isAlive = false;
+      client.ping();
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+
+  heartbeatInterval.unref();
+  wss.on("close", () => clearInterval(heartbeatInterval));
 
   function sendToUsers(userIds, event) {
     const message =
@@ -148,6 +165,11 @@ function createWebSocketServer(
     "connection",
     async (socket, request) => {
       try {
+        socket.isAlive = true;
+        socket.on("pong", () => {
+          socket.isAlive = true;
+        });
+
         const cookies = parseCookies(
           request.headers.cookie
         );

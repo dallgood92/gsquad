@@ -44,8 +44,7 @@ async function withAttachmentUrls(message, storage) {
 
 async function getRecipientUserIds(
   prisma,
-  conversationId,
-  senderUserId
+  conversationId
 ) {
   const members =
     await prisma.conversationMember.findMany({
@@ -58,15 +57,9 @@ async function getRecipientUserIds(
       },
     });
 
-  return members
-    .map(
-      (member) =>
-        member.userId
-    )
-    .filter(
-      (userId) =>
-        userId !== senderUserId
-    );
+  return members.map(
+    (member) => member.userId
+  );
 }
 
 module.exports =

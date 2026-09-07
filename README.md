@@ -34,6 +34,8 @@ The browser uses the API for durable operations and a WebSocket for immediate up
 
 See [System design](docs/system-design.md) for detailed component, data, authorization, deployment, and sequence diagrams.
 
+For a file-by-file frontend and backend walkthrough, internal state ownership, event flows, and a change-location index, see the [Developer guide](docs/developer-guide.md).
+
 For the complete production AWS setup and deployment procedure, see [AWS deployment](docs/aws-deployment.md). The repository includes Terraform infrastructure, a production server container, and first-deploy/redeploy commands.
 
 ## Repository layout
