@@ -9,7 +9,6 @@ import ConversationList from "./components/ConversationList";
 import MessageList from "./components/MessageList";
 import MessageSearch from "./components/MessageSearch";
 import MessageInput from "./components/MessageInput";
-import ThreadPanel from "./components/ThreadPanel";
 import PinnedMessages from "./components/PinnedMessages";
 import NotificationCenter from "./components/NotificationCenter";
 import ArchivedConversations from "./components/ArchivedConversations";
@@ -74,7 +73,7 @@ function App() {
     user?.id
   );
 
-  const [threadMessage, setThreadMessage] = useState(null);
+  const [replyMessage, setReplyMessage] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showPinnedMessages, setShowPinnedMessages] = useState(false);
   const [pinsRevision, setPinsRevision] = useState(0);
@@ -98,7 +97,7 @@ function App() {
   useClickOutside(memberListRef, closeMembers, showMembers);
 
   const handleSelectConversation = (conversationId) => {
-    setThreadMessage(null);
+    setReplyMessage(null);
     setShowPinnedMessages(false);
     setShowRoomMenu(false);
     setShowMembers(false);
@@ -109,7 +108,6 @@ function App() {
 
   const handleSearchResult = (message) => {
     handleSelectConversation(message.conversationId);
-    if (message.replyToMessage) setThreadMessage(message.replyToMessage);
   };
 
   const handleTogglePin = async (messageId) => {
@@ -648,7 +646,7 @@ function App() {
                 onDeleteMessage={
                   deleteMessage
                 }
-                onReply={setThreadMessage}
+                onReply={setReplyMessage}
                 onTogglePin={handleTogglePin}
                 onRetryMessage={retryMessage}
               />
@@ -683,25 +681,16 @@ function App() {
               onTypingStop={
                 handleTypingStop
               }
+              replyToMessage={replyMessage}
+              onCancelReply={() => setReplyMessage(null)}
             />
-            {threadMessage && (
-              <ThreadPanel
-                key={`thread:${selectedConversation.id}:${threadMessage.id}`}
-                conversationId={selectedConversation.id}
-                rootMessage={threadMessage}
-                liveMessages={selectedConversation.messages}
-                onClose={() => setThreadMessage(null)}
-                onSendMessage={sendMessage}
-              />
-            )}
             {showPinnedMessages && (
               <PinnedMessages
                 conversationId={selectedConversation.id}
                 revision={pinsRevision}
                 onClose={() => setShowPinnedMessages(false)}
-                onSelect={(message) => {
+                onSelect={() => {
                   setShowPinnedMessages(false);
-                  if (message.replyToMessage) setThreadMessage(message.replyToMessage);
                 }}
               />
             )}

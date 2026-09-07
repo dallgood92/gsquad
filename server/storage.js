@@ -10,15 +10,18 @@ const MAX_VIDEO_SIZE = 250 * 1024 * 1024;
 function createStorage() {
   const bucket = process.env.S3_BUCKET;
   const region = process.env.S3_REGION;
-  const configured = Boolean(bucket && region && process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY);
+  const configured = Boolean(bucket && region);
+  const staticCredentials = process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY
+    ? {
+        accessKeyId: process.env.S3_ACCESS_KEY_ID,
+        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+      }
+    : undefined;
   const client = configured ? new S3Client({
     region,
     endpoint: process.env.S3_ENDPOINT || undefined,
     forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "true",
-    credentials: {
-      accessKeyId: process.env.S3_ACCESS_KEY_ID,
-      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
-    },
+    credentials: staticCredentials,
   }) : null;
 
   const assertConfigured = () => {

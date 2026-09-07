@@ -91,7 +91,7 @@ function ConversationList({
         <Avatar user={conversation.type === "DIRECT" ? otherMember?.user : null} name={displayName} />
         <span className="conversation-copy">
           <span className="conversation-name">{displayName}</span>
-          <span className="conversation-preview">{conversation.lastMessage ? `${conversation.lastMessage.sender?.name}: ${conversation.lastMessage.text}` : "No messages yet"}</span>
+          <span className="conversation-preview">{conversation.lastMessage ? (conversation.type === "DIRECT" ? (conversation.lastMessage.text || (conversation.lastMessage.attachments?.[0]?.mimeType?.startsWith("video/") ? "Video" : "Photo")) : `${conversation.lastMessage.sender?.name}: ${conversation.lastMessage.text || (conversation.lastMessage.attachments?.[0]?.mimeType?.startsWith("video/") ? "Video" : "Photo")}`) : "No messages yet"}</span>
         </span>
         <div className="conversation-signals">
           {conversation.members.find((membership) => membership.userId === currentUserId)?.notificationsMuted && <span className="muted-icon" title="Notifications muted">⌁</span>}

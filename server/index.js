@@ -44,11 +44,25 @@ const app = express();
 const prisma = new PrismaClient();
 const storage = createStorage();
 
-const PORT = 3001;
+const PORT = Number(process.env.PORT || 3001);
+const HOST = process.env.HOST || "0.0.0.0";
+const allowedOrigins = (process.env.CLIENT_ORIGINS || "http://localhost:5174")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.set("trust proxy", 1);
 
 app.use(
   cors({
-    origin: "http://localhost:5174",
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error("Origin not allowed"));
+    },
     credentials: true,
   })
 );
@@ -169,11 +183,24 @@ async function startServer() {
 
     app.use("/attachments", requireAuth, createAttachmentRoutes(prisma, storage));
 
-    server.listen(PORT, () => {
+    server.listen(PORT, HOST, () => {
       console.log(
-        `Server running on port ${PORT}`
+        `Server running on ${HOST}:${PORT}`
       );
     });
+
+    const shutdown = (signal) => {
+      console.log(`${signal} received; closing server`);
+      server.close(async () => {
+        await prisma.$disconnect();
+        process.exit(0);
+      });
+
+      setTimeout(() => process.exit(1), 10000).unref();
+    };
+
+    process.once("SIGTERM", () => shutdown("SIGTERM"));
+    process.once("SIGINT", () => shutdown("SIGINT"));
   } catch (error) {
     console.error(
       "Failed to start server:",

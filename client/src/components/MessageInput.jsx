@@ -58,6 +58,10 @@ function MessageInput({
     textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
   }, [message]);
 
+  useEffect(() => {
+    if (replyToMessage) textareaRef.current?.focus();
+  }, [replyToMessage]);
+
   const stopTyping = () => {
     if (!isTypingRef.current) {
       return;
@@ -122,6 +126,9 @@ function MessageInput({
       setAttachmentError(error.message || "The attachment could not be sent");
     } finally {
       setSending(false);
+      window.requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+      });
     }
   };
 
@@ -136,8 +143,10 @@ function MessageInput({
     <div className="message-composer">
       {replyToMessage && (
         <div className="reply-composer-preview">
-          <span>
-            Replying to {replyToMessage.sender.name}: {replyToMessage.text}
+          <span className="reply-composer-accent" />
+          <span className="reply-composer-copy">
+            <strong>Replying to {replyToMessage.sender.name}</strong>
+            <small>{replyToMessage.deletedAt ? "Message deleted" : replyToMessage.text || (replyToMessage.attachments?.[0]?.mimeType.startsWith("video/") ? "Video" : "Photo")}</small>
           </span>
           <button type="button" onClick={onCancelReply} aria-label="Cancel reply">×</button>
         </div>

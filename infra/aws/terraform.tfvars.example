@@ -1,0 +1,7 @@
+aws_region       = "us-east-2"
+app_name         = "gsquad"
+root_domain      = "example.com"
+route53_zone_id  = "Z0123456789EXAMPLE"
+google_client_id = "000000000000-example.apps.googleusercontent.com"
+image_tag        = "latest"
+desired_count    = 1

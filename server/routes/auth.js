@@ -6,6 +6,13 @@ const router = express.Router();
 
 module.exports = function createAuthRoutes(prisma) {
   const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+  const production = process.env.NODE_ENV === "production";
+  const sessionCookie = {
+    httpOnly: true,
+    secure: production,
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  };
 
   router.post("/google", async (req, res) => {
     try {
@@ -67,12 +74,7 @@ module.exports = function createAuthRoutes(prisma) {
         }
       );
 
-      res.cookie("session", token, {
-        httpOnly: true,
-        secure: false,
-        sameSite: "lax",
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
+      res.cookie("session", token, sessionCookie);
 
       res.json({
         user,
@@ -128,7 +130,7 @@ module.exports = function createAuthRoutes(prisma) {
   router.post("/logout", (req, res) => {
     res.clearCookie("session", {
       httpOnly: true,
-      secure: false,
+      secure: production,
       sameSite: "lax",
     });
 
